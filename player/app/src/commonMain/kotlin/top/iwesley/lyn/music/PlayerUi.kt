@@ -35,7 +35,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -1346,8 +1345,6 @@ private fun PlayerOverlay(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        // 定制改动：避开系统状态栏，横竖屏切换后顶部返回/菜单按钮不会被压在状态栏下面
-                        .statusBarsPadding()
                         .padding(horizontal = 26.dp, vertical = 20.dp),
                     verticalArrangement = Arrangement.spacedBy(20.dp),
                 ) {
