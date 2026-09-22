@@ -50,6 +50,7 @@ class MainActivity : ComponentActivity() {
     private var externalAudioOpenJob: Job? = null
     private var externalAudioOpenRequestId = 0L
     internal var pendingUseDarkSystemBarIcons: Boolean = false
+    private var immersiveSystemBarsController: AndroidImmersiveSystemBarsController? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge(
@@ -91,10 +92,15 @@ class MainActivity : ComponentActivity() {
                 val appDisplayScalePreset by appComponent.appDisplayScalePreset.collectAsState()
                 ProvideFixedAndroidComposeDensity(appDisplayScalePreset = appDisplayScalePreset) {
                     AndroidMainShellSystemBars(appComponent)
+                    val immersiveController = remember {
+                        AndroidImmersiveSystemBarsController(this@MainActivity)
+                            .also { immersiveSystemBarsController = it }
+                    }
                     CompositionLocalProvider(
                         LocalSystemVolumeController provides remember {
                             AndroidSystemVolumeController(this@MainActivity)
                         },
+                        LocalImmersiveSystemBarsController provides immersiveController,
                     ) {
                         App(
                             component = appComponent,
@@ -125,12 +131,16 @@ class MainActivity : ComponentActivity() {
         applyEdgeToEdgeSystemBars(pendingUseDarkSystemBarIcons)
         window.decorView.post {
             applyEdgeToEdgeSystemBars(pendingUseDarkSystemBarIcons)
+            // 定制改动：全屏歌词（纯净模式）若正在沉浸式，转屏后系统可能重新放出
+            // 状态栏/导航栏，这里补一次隐藏。
+            immersiveSystemBarsController?.apply()
         }
     }
 
     override fun onResume() {
         super.onResume()
         applyEdgeToEdgeSystemBars(pendingUseDarkSystemBarIcons)
+        immersiveSystemBarsController?.apply()
         appComponent?.settingsStore?.dispatch(SettingsIntent.RecheckDesktopLyricsPermission)
     }
 
