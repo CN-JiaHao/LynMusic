@@ -2100,16 +2100,25 @@ private fun PlayerBottomControls(
             ) {
                 Text(
                     text = formatDuration(snapshot.positionMs),
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 14.sp),
                     color = Color.White,
                 )
                 Text(
                     text = formatDuration(snapshot.durationMs),
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 14.sp),
                     color = Color.White,
                 )
             }
             if (wide) {
+                PlaybackProgress(
+                    snapshot = snapshot,
+                    onPlayerIntent = onPlayerIntent,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp),
+                    showTimeLabels = false,
+                    enlarged = true,
+                )
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -2201,18 +2210,6 @@ private fun PlayerBottomControls(
                 }
             }
         }
-        PlaybackProgress(
-            snapshot = snapshot,
-            onPlayerIntent = onPlayerIntent,
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .offset(y = 5.dp)
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            showTimeLabels = false,
-            floating = true,
-            enlarged = true,
-        )
     }
     if (isSleepTimerDialogVisible) {
         SleepTimerDialog(
@@ -3112,7 +3109,7 @@ private fun PlaybackProgress(
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(if (enlarged) 44.dp else if (floating) 12.dp else 22.dp),
+                .height(if (enlarged) 16.dp else if (floating) 12.dp else 22.dp),
         ) {
             val boxWidth = maxWidth
             val thumbInsetPx = with(LocalDensity.current) { if (floating) 6.dp.toPx() else 8.dp.toPx() }
@@ -3171,21 +3168,21 @@ private fun PlaybackProgress(
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
-                        .offset(x = bubbleOffsetX)
+                        .offset(x = bubbleOffsetX, y = (-30).dp)
                         .clip(RoundedCornerShape(percent = 50))
                         .background(Color.White.copy(alpha = 0.18f))
                         .padding(horizontal = 10.dp, vertical = 3.dp),
                 ) {
                     Text(
                         text = formatDuration(displayPositionMs),
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 13.sp),
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 16.sp),
                         color = Color.White,
                     )
                 }
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .offset(x = thumbCenterX - boxWidth / 2f, y = -2.5.dp)
+                        .offset(x = thumbCenterX - boxWidth / 2f)
                         .size(15.dp)
                         .clip(RoundedCornerShape(percent = 50))
                         .background(Color.White),
