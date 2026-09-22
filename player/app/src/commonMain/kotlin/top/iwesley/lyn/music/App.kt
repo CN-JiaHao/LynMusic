@@ -613,7 +613,10 @@ fun App(
                     }
                 }
             }
-            component.settingsStore.dispatch(SettingsIntent.CheckAppUpdateSilently)
+            // 定制改动：自用版关闭启动时联网检查更新。
+            // 官方版与本自用版签名不同，一旦提示更新，用户下载官方包覆盖安装必然失败，
+            // 因此整条更新提示链路（静默检查 + 红点 + 关于页入口）一并停用。
+            // component.settingsStore.dispatch(SettingsIntent.CheckAppUpdateSilently)
             activateStartupStores(
                 component = component,
                 selectedTab = selectedTab,
