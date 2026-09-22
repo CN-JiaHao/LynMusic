@@ -1169,7 +1169,7 @@ private fun PlaylistListPane(
                             Icon(Icons.Rounded.Tune, contentDescription = null)
                             Spacer(Modifier.width(8.dp))
                             Text(
-                                text = 排序： + playlistSortMode.label,
+                                text = "排序：" + playlistSortMode.label,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
