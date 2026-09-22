@@ -14,6 +14,7 @@ internal data class VisiblePlayerLyricsLine(
     val rawIndex: Int,
     val line: LyricsLine,
     val enhancedLine: EnhancedLyricsDisplayLine? = null,
+    val translationLine: LyricsLine? = null,
 )
 
 internal data class PlayerLyricsVisibleItemInfo(
@@ -26,7 +27,7 @@ internal fun buildVisiblePlayerLyricsLines(
     lyrics: LyricsDocument,
     enhancedLyricsPresentation: EnhancedLyricsPresentation? = null,
 ): List<VisiblePlayerLyricsLine> {
-    return lyrics.lines.mapIndexedNotNull { rawIndex, line ->
+    val rawLines = lyrics.lines.mapIndexedNotNull { rawIndex, line ->
         if (isPlayerLyricsStructureTagLine(line.text)) {
             return@mapIndexedNotNull null
         }
@@ -36,6 +37,50 @@ internal fun buildVisiblePlayerLyricsLines(
             enhancedLine = enhancedLyricsPresentation?.lines?.getOrNull(rawIndex),
         )
     }
+    return mergeBilingualPlayerLyricsLines(rawLines)
+}
+
+/**
+ * 定制改动：把「时间戳完全相同的相邻两行」合并成「原文 + 译文」一组。
+ *
+ * 自定义双语 LRC 的常见写法是同一时间戳写两行，第一行原文、第二行译文：
+ *   [00:16.24]You can't catch me boy
+ *   [00:16.24]你追不上我，小子
+ *
+ * 原逻辑逐行映射，这两行会被当成两句独立歌词：各自占一行、字号一致、
+ * 高亮也各自独立（唱到这句时只有其中一行亮），完全看不出原文与译文的主次。
+ *
+ * 合并条件（三条同时满足才合并，避免误伤）：
+ * 1. 相邻两行都有时间戳，且时间戳完全相等；
+ * 2. 前一行没有自带译文（增强歌词自带译文时以其为准，不覆盖）；
+ * 3. 后一行文本非空。
+ *
+ * rawIndex 保留原始下标，滚动与高亮的索引换算不受影响。
+ */
+private fun mergeBilingualPlayerLyricsLines(
+    lines: List<VisiblePlayerLyricsLine>,
+): List<VisiblePlayerLyricsLine> {
+    if (lines.size < 2) return lines
+    val merged = ArrayList<VisiblePlayerLyricsLine>(lines.size)
+    var index = 0
+    while (index < lines.size) {
+        val current = lines[index]
+        val next = lines.getOrNull(index + 1)
+        val currentTimestamp = current.line.timestampMs
+        val canMerge = currentTimestamp != null &&
+            next != null &&
+            next.line.timestampMs == currentTimestamp &&
+            current.enhancedLine?.translationText.isNullOrBlank() &&
+            next.line.text.isNotBlank()
+        if (canMerge) {
+            merged.add(current.copy(translationLine = next!!.line))
+            index += 2
+        } else {
+            merged.add(current)
+            index += 1
+        }
+    }
+    return merged
 }
 
 internal fun shouldShowPlayerLyricsEmptyState(
