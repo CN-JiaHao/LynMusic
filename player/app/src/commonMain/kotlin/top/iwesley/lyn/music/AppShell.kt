@@ -769,7 +769,7 @@ private fun HeroHeader() {
         if (desktopWindowChrome.immersiveTitleBarEnabled) desktopWindowChrome.topInset + 48.dp
         else 56.dp
     Text(
-        text = "LynMusic",
+        text = "Music",
         style = MaterialTheme.typography.headlineMedium,
         fontWeight = FontWeight.ExtraBold,
         color = MaterialTheme.colorScheme.onSurface,
