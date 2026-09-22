@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -623,7 +624,9 @@ internal fun DesktopShell(
         Column(
             modifier = Modifier
                 .weight(1f)
-                .fillMaxHeight(),
+                .fillMaxHeight()
+                // 定制改动：主界面内容避开系统状态栏，横竖屏下搜索栏/页头不再与状态栏文字重叠
+                .statusBarsPadding(),
         ) {
             TabContent(
                 selectedTab = selectedTab,
