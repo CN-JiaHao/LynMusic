@@ -15,12 +15,15 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.ViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -46,7 +49,7 @@ class MainActivity : ComponentActivity() {
     private var pendingExternalAudioOpenIntent: Intent? = null
     private var externalAudioOpenJob: Job? = null
     private var externalAudioOpenRequestId = 0L
-    internal var pendingSystemBarStyle: SystemBarStyle = SystemBarStyle.dark(Color.TRANSPARENT)
+    internal var pendingUseDarkSystemBarIcons: Boolean = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge(
@@ -116,14 +119,18 @@ class MainActivity : ComponentActivity() {
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
-        // 定制改动：旋转不再重建 Activity，edge-to-edge 的窗口属性需要自己重新应用，
-        // 否则横竖屏切换后状态栏/导航栏的透明与图标配色会回退，看起来像"状态栏不见了"。
-        applyEdgeToEdgeSystemBars(pendingSystemBarStyle)
+        // 定制改动：旋转不再重建 Activity，状态栏外观（透明 + 图标深浅色）需要自己重新应用。
+        // 实测部分 ROM（澎湃 OS）会在本回调之后再用系统默认外观覆盖一次，
+        // 所以立即应用一次之外，再 post 到 decorView 队列下一拍补一次。
+        applyEdgeToEdgeSystemBars(pendingUseDarkSystemBarIcons)
+        window.decorView.post {
+            applyEdgeToEdgeSystemBars(pendingUseDarkSystemBarIcons)
+        }
     }
 
     override fun onResume() {
         super.onResume()
-        applyEdgeToEdgeSystemBars(pendingSystemBarStyle)
+        applyEdgeToEdgeSystemBars(pendingUseDarkSystemBarIcons)
         appComponent?.settingsStore?.dispatch(SettingsIntent.RecheckDesktopLyricsPermission)
     }
 
@@ -176,22 +183,37 @@ private fun MainActivity.AndroidMainShellSystemBars(
         )
     }
     val useDarkSystemBarIcons = !playerState.isExpanded && textPalette == AppThemeTextPalette.Black
+    // 读 LocalConfiguration：转屏触发重组，从而让下面的 LaunchedEffect 重新应用状态栏外观
+    val configuration = LocalConfiguration.current
 
     SideEffect {
-        pendingSystemBarStyle = if (useDarkSystemBarIcons) {
-            SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
-        } else {
-            SystemBarStyle.dark(Color.TRANSPARENT)
-        }
-        applyEdgeToEdgeSystemBars(pendingSystemBarStyle)
+        pendingUseDarkSystemBarIcons = useDarkSystemBarIcons
+        applyEdgeToEdgeSystemBars(useDarkSystemBarIcons)
+    }
+    LaunchedEffect(configuration) {
+        applyEdgeToEdgeSystemBars(pendingUseDarkSystemBarIcons)
     }
 }
 
-private fun ComponentActivity.applyEdgeToEdgeSystemBars(style: SystemBarStyle) {
+private fun ComponentActivity.applyEdgeToEdgeSystemBars(useDarkIcons: Boolean) {
     enableEdgeToEdge(
-        statusBarStyle = style,
-        navigationBarStyle = style,
+        statusBarStyle = if (useDarkIcons) {
+            SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
+        } else {
+            SystemBarStyle.dark(Color.TRANSPARENT)
+        },
+        navigationBarStyle = if (useDarkIcons) {
+            SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
+        } else {
+            SystemBarStyle.dark(Color.TRANSPARENT)
+        },
     )
+    // 直接向 InsetsController 声明图标深浅色：enableEdgeToEdge 在部分 ROM 上
+    // 转屏后不会真正落盘 appearance，这里显式设置一次作为兜底。
+    WindowCompat.getInsetsController(window, window.decorView).apply {
+        isAppearanceLightStatusBars = useDarkIcons
+        isAppearanceLightNavigationBars = useDarkIcons
+    }
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
         window.isNavigationBarContrastEnforced = false
         window.isStatusBarContrastEnforced = false
