@@ -296,7 +296,7 @@ internal fun MobileShell(
     val mobileNavIconSize = 29.dp
     val moreTabs = remember(platform) { mobileMoreNavigationTabs(platform) }
     val isMoreSelected = selectedTab in moreTabs
-    val showSettingsUpdateBadge = settingsState.appUpdateHasNewVersion == true
+    val showSettingsUpdateBadge = false // 定制：自用版不显示更新红点
     val effectivePlayerSnapshot = playerState.effectiveSnapshot
     val keyboardController = LocalSoftwareKeyboardController.current
     var isMoreSheetVisible by rememberSaveable { mutableStateOf(false) }
@@ -606,7 +606,7 @@ internal fun DesktopShell(
                 DesktopNav(
                     selectedTab = selectedTab,
                     platform = platform,
-                    showSettingsUpdateBadge = settingsState.appUpdateHasNewVersion == true,
+                    showSettingsUpdateBadge = false, // 定制：自用版不显示更新红点
                     onTabSelected = onTabSelected,
                     modifier = Modifier.padding(horizontal = 18.dp),
                 )
