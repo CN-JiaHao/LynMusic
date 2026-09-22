@@ -36,7 +36,11 @@ data class PlaylistsState(
     val isImporting: Boolean = false,
     val playlistImportReport: PlaylistImportReport? = null,
     val message: String? = null,
+    val playlistSortMode: String = DEFAULT_PLAYLIST_SORT_MODE,
 )
+
+const val DEFAULT_PLAYLIST_SORT_MODE = "SERVER"
+const val CUSTOM_PLAYLIST_SORT_MODE = "CUSTOM"
 
 sealed interface PlaylistsIntent {
     data class SelectPlaylist(val playlistId: String?) : PlaylistsIntent
@@ -52,6 +56,7 @@ sealed interface PlaylistsIntent {
     data object Refresh : PlaylistsIntent
     data class ReorderPlaylists(val orderedPlaylistIds: List<String>) : PlaylistsIntent
     data object ClearPlaylistCustomOrder : PlaylistsIntent
+    data class SetPlaylistSortMode(val mode: String) : PlaylistsIntent
     data object ClearPlaylistImportReport : PlaylistsIntent
     data object ClearMessage : PlaylistsIntent
 }
@@ -86,11 +91,13 @@ class PlaylistsStore(
                 playlistRepository.playlists,
                 importSourceRepository.observeSources(),
                 offlineDownloadRepository.downloads,
-            ) { playlists, sources, offlineDownloads ->
+                playlistRepository.playlistSortMode,
+            ) { playlists, sources, offlineDownloads, sortMode ->
                 Snapshot(
                     playlists = playlists,
                     sources = sources,
                     offlineDownloadsByTrackId = offlineDownloads,
+                    sortMode = sortMode,
                     navidromeSourceIds = sources
                         .map(SourceWithStatus::source)
                         .filter { it.isLocalIndexedEnabled() }
@@ -117,6 +124,8 @@ class PlaylistsStore(
                     it.copy(
                         isLoadingContent = false,
                         playlists = snapshot.playlists,
+                        playlistSortMode = snapshot.sortMode
+                            ?: defaultPlaylistSortMode(snapshot.playlists),
                         selectedPlaylistId = nextSelectedId,
                         selectedSourceFilter = selectedSourceFilter,
                         availableSourceFilters = availableSourceFilters,
@@ -158,6 +167,7 @@ class PlaylistsStore(
             is PlaylistsIntent.RemoveTrackFromPlaylist -> removeTrackFromPlaylist(intent.playlistId, intent.trackId)
             is PlaylistsIntent.ReorderPlaylists -> reorderPlaylists(intent.orderedPlaylistIds)
             PlaylistsIntent.ClearPlaylistCustomOrder -> clearPlaylistCustomOrder()
+            is PlaylistsIntent.SetPlaylistSortMode -> setPlaylistSortMode(intent.mode)
         }
     }
 
@@ -166,6 +176,11 @@ class PlaylistsStore(
             .onFailure { throwable ->
                 updateState { it.copy(message = throwable.message.orEmpty().ifBlank { "歌单排序保存失败。" }) }
             }
+    }
+
+    private suspend fun setPlaylistSortMode(mode: String) {
+        updateState { it.copy(playlistSortMode = mode) }
+        runCatching { playlistRepository.setPlaylistSortMode(mode) }
     }
 
     private suspend fun clearPlaylistCustomOrder() {
@@ -326,7 +341,16 @@ class PlaylistsStore(
         val sources: List<SourceWithStatus>,
         val offlineDownloadsByTrackId: Map<String, OfflineDownload>,
         val navidromeSourceIds: Set<String>,
+        val sortMode: String? = null,
     )
+
+    private fun defaultPlaylistSortMode(playlists: List<PlaylistSummary>): String {
+        return if (playlists.any { it.customOrder != null }) {
+            CUSTOM_PLAYLIST_SORT_MODE
+        } else {
+            DEFAULT_PLAYLIST_SORT_MODE
+        }
+    }
 
     private fun buildAvailableSourceFilters(sources: List<SourceWithStatus>): List<LibrarySourceFilter> {
         val presentFilters = sources
