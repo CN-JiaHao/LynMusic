@@ -89,6 +89,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -3175,7 +3176,10 @@ private fun PlaybackVolume(
     onPlayerIntent: (PlayerIntent) -> Unit,
     sliderWidthFraction: Float = 1f,
 ) {
-    val volume = snapshot.volume.coerceIn(0f, 1f)
+    val systemVolumeController = LocalSystemVolumeController.current
+    val systemVolume by systemVolumeController.volume.collectAsState()
+    val useSystemVolume = systemVolumeController.isAvailable
+    val volume = (if (useSystemVolume) systemVolume else snapshot.volume).coerceIn(0f, 1f)
     Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -3207,7 +3211,13 @@ private fun PlaybackVolume(
                     .graphicsLayer(scaleY = 0.44f),
                 colors = transparentTrackSliderColors(),
                 value = volume,
-                onValueChange = { onPlayerIntent(PlayerIntent.SetVolume(it)) },
+                onValueChange = { nextVolume ->
+                    if (useSystemVolume) {
+                        systemVolumeController.setVolume(nextVolume)
+                    } else {
+                        onPlayerIntent(PlayerIntent.SetVolume(nextVolume))
+                    }
+                },
                 valueRange = 0f..1f,
             )
         }
