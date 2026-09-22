@@ -1,0 +1,152 @@
+name: Personal Android APK (signed)
+
+# 自用定制版构建：只出手机端 APK，并自动签名，产物直接挂到 GitHub Release。
+# 原仓库的 build_kmp.yml 会同时构建 Windows/macOS/Linux/桌面 + TV + 车机，
+# 对自用场景是浪费，已在本 fork 移除。
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-android-signed:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'zulu'
+
+      - uses: gradle/actions/setup-gradle@v3
+
+      - name: Configure Gradle memory for CI
+        shell: bash
+        run: |
+          mkdir -p "$HOME/.gradle"
+          cat > "$HOME/.gradle/gradle.properties" <<'EOF'
+          org.gradle.jvmargs=-Xmx2048m -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8
+          kotlin.daemon.jvmargs=-Xmx1536M
+          org.gradle.workers.max=2
+          EOF
+
+      - name: Build Android release APK (unsigned)
+        run: ./gradlew :composeApp:assembleRelease
+
+      - name: Locate Android build tools
+        id: tools
+        shell: bash
+        run: |
+          SDK="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          if [ -z "$SDK" ]; then SDK=/usr/local/lib/android/sdk; fi
+          echo "sdk=$SDK"
+          APKSIGNER=$(find "$SDK/build-tools" -maxdepth 2 -name apksigner 2>/dev/null | sort -V | tail -n 1)
+          ZIPALIGN=$(find "$SDK/build-tools" -maxdepth 2 -name zipalign 2>/dev/null | sort -V | tail -n 1)
+          if [ -z "$APKSIGNER" ]; then
+            echo "build-tools not found, installing..."
+            yes | "$SDK/cmdline-tools/latest/bin/sdkmanager" --install "build-tools;35.0.0" --sdk_root="$SDK" >/dev/null 2>&1 || true
+            APKSIGNER=$(find "$SDK/build-tools" -maxdepth 2 -name apksigner 2>/dev/null | sort -V | tail -n 1)
+            ZIPALIGN=$(find "$SDK/build-tools" -maxdepth 2 -name zipalign 2>/dev/null | sort -V | tail -n 1)
+          fi
+          if [ -z "$APKSIGNER" ]; then
+            echo "::error::apksigner not found"
+            exit 1
+          fi
+          echo "apksigner=$APKSIGNER" >> "$GITHUB_OUTPUT"
+          echo "zipalign=$ZIPALIGN" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare signing keystore
+        id: keystore
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.SIGNING_KEYSTORE_PASSWORD || 'lynpersonal' }}
+          KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS || 'lyn' }}
+          KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD || 'lynpersonal' }}
+        run: |
+          set -e
+          GENERATED=false
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "使用仓库 Secret 中已固化的签名密钥"
+            printf '%s' "$KEYSTORE_BASE64" | base64 -d > /tmp/lyn.jks
+          else
+            echo "未配置 SIGNING_KEYSTORE_BASE64，生成本次专用签名密钥"
+            GENERATED=true
+            keytool -genkeypair -v \
+              -keystore /tmp/lyn.jks \
+              -keyalg RSA -keysize 2048 -validity 10950 \
+              -alias "$KEY_ALIAS" \
+              -storepass "$KEYSTORE_PASSWORD" \
+              -keypass "$KEY_PASSWORD" \
+              -dname "CN=LynMusic Personal, OU=Personal, O=Personal, L=Wuhan, ST=Hubei, C=CN"
+            mkdir -p keystore-out
+            cp /tmp/lyn.jks keystore-out/lyn-release.jks
+          fi
+          echo "generated=$GENERATED" >> "$GITHUB_OUTPUT"
+          echo "alias=$KEY_ALIAS" >> "$GITHUB_OUTPUT"
+          echo "storepass=$KEYSTORE_PASSWORD" >> "$GITHUB_OUTPUT"
+          echo "keypass=$KEY_PASSWORD" >> "$GITHUB_OUTPUT"
+
+      - name: Align and sign APKs
+        shell: bash
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.SIGNING_KEYSTORE_PASSWORD || 'lynpersonal' }}
+          KEY_ALIAS: ${{ steps.keystore.outputs.alias }}
+          KEY_PASSWORD: ${{ steps.keystore.outputs.keypass }}
+        run: |
+          set -e
+          APKSIGNER="${{ steps.tools.outputs.apksigner }}"
+          ZIPALIGN="${{ steps.tools.outputs.zipalign }}"
+          mkdir -p signed-apk
+          find composeApp/build/outputs/apk/release -name "*.apk" | sort | while read -r apk; do
+            base=$(basename "$apk" .apk)
+            aligned="/tmp/${base}-aligned.apk"
+            if [ -n "$ZIPALIGN" ]; then
+              "$ZIPALIGN" -p -f -v 4 "$apk" "$aligned" >/dev/null
+            else
+              cp "$apk" "$aligned"
+            fi
+            "$APKSIGNER" sign --verbose \
+              --ks /tmp/lyn.jks \
+              --ks-key-alias "$KEY_ALIAS" \
+              --ks-pass "pass:$KEYSTORE_PASSWORD" \
+              --key-pass "pass:$KEY_PASSWORD" \
+              --out "signed-apk/${base}-signed.apk" \
+              "$aligned"
+            "$APKSIGNER" verify --print-certs "signed-apk/${base}-signed.apk" | head -n 5
+          done
+          ls -lh signed-apk
+
+      - name: Show build outputs
+        shell: bash
+        run: find signed-apk -type f | sort
+
+      - name: Attach signed APK to release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -e
+          gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1 || \
+            gh release create "${GITHUB_REF_NAME}" --title "${GITHUB_REF_NAME} 自用定制版" --notes "自动化构建：已签名的手机端 APK（LynMusic 自用定制版）" --verify-tag
+          gh release upload "${GITHUB_REF_NAME}" signed-apk/*.apk --clobber
+
+      - name: Upload signed APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LynMusic-signed-apk
+          path: signed-apk/*.apk
+          if-no-files-found: error
+
+      - name: Upload generated keystore (keep it)
+        if: steps.keystore.outputs.generated == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: SIGNING-KEYSTORE-KEEP-THIS-FILE
+          path: keystore-out/lyn-release.jks
+          if-no-files-found: error
