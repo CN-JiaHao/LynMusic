@@ -26,6 +26,7 @@ import top.iwesley.lyn.music.core.model.trackArtworkCacheKey
 import top.iwesley.lyn.music.data.db.ImportSourceEntity
 import top.iwesley.lyn.music.data.db.LynMusicDatabase
 import top.iwesley.lyn.music.data.db.PlaylistEntity
+import top.iwesley.lyn.music.data.db.PlaylistPreferenceEntity
 import top.iwesley.lyn.music.data.db.PlaylistRemoteBindingEntity
 import top.iwesley.lyn.music.data.db.PlaylistTrackEntity
 import top.iwesley.lyn.music.data.db.TrackEntity
@@ -43,6 +44,8 @@ import top.iwesley.lyn.music.domain.RemoteSourceAddressSelector
 import top.iwesley.lyn.music.domain.resolveEmbySource
 import top.iwesley.lyn.music.domain.toSubsonicAuthMode
 import top.iwesley.lyn.music.domain.updateEmbyPlaylistName
+
+private const val PLAYLIST_SORT_MODE_KEY = "playlist_sort_mode"
 
 class RoomPlaylistRepository(
     private val database: LynMusicDatabase,
@@ -455,6 +458,18 @@ class RoomPlaylistRepository(
                 database.playlistDao().updateCustomOrder(playlistId, index)
             }
         }
+    }
+
+    override val playlistSortMode: Flow<String?> =
+        database.playlistPreferenceDao().observeValue(PLAYLIST_SORT_MODE_KEY)
+
+    override suspend fun setPlaylistSortMode(mode: String) {
+        database.playlistPreferenceDao().upsert(
+            PlaylistPreferenceEntity(
+                prefKey = PLAYLIST_SORT_MODE_KEY,
+                prefValue = mode,
+            ),
+        )
     }
 
     override suspend fun clearPlaylistCustomOrder(): Result<Unit> {
