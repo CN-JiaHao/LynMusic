@@ -941,7 +941,9 @@ internal fun PlaylistsTab(
                 showRefreshActionButton = showRefreshActionButton,
                 showSourceFilterActionButton = showSourceFilterActionButton,
                 playlistSortMode = playlistSortMode,
-                onSortModeChanged = { playlistSortMode = it },
+                onSortModeChanged = { mode ->
+                    onPlaylistsIntent(PlaylistsIntent.SetPlaylistSortMode(mode.name))
+                },
                 onReorder = { orderedIds ->
                     onPlaylistsIntent(PlaylistsIntent.ReorderPlaylists(orderedIds))
                 },
