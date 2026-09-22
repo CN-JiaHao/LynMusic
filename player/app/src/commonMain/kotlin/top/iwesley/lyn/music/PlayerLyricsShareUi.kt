@@ -134,10 +134,6 @@ internal fun PlayerLyricsPane(
     val lyricsPrimaryTextColor = Color.White
     val lyricsSecondaryTextColor = Color.White.copy(alpha = 0.6f)
     var showTrackInfoDialog by rememberSaveable(track.id, mobilePlayback) { mutableStateOf(false) }
-    // 定制改动：歌词字号档位（0 小 / 1 标准 / 2 大 / 3 特大）与译文显示开关，
-    // 用 rememberSaveable 保存，转屏不会丢（进程重启回默认）。
-    var lyricsFontSizeLevel by rememberSaveable { mutableStateOf(1) }
-    var showLyricsTranslation by rememberSaveable { mutableStateOf(true) }
     val lyrics = state.lyrics
     val enhancedLyricsPresentation = remember(lyrics) {
         lyrics?.let { document ->
@@ -305,7 +301,6 @@ internal fun PlayerLyricsPane(
                 }
             } else if (lyrics != null && visibleLyricsLines.isNotEmpty()) {
                 BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-                    var showLyricsOptionsMenu by remember { mutableStateOf(false) }
                     val centerPadding =
                         (maxHeight / 2 - 36.dp).coerceAtLeast(if (compact) 56.dp else 86.dp)
                     val browseSeekPositionMs = resolvePlayerLyricsSeekPositionMs(
@@ -359,14 +354,12 @@ internal fun PlayerLyricsPane(
                         itemsIndexed(visibleLyricsLines) { index, visibleLine ->
                             val line = visibleLine.line
                             val enhancedLine = visibleLine.enhancedLine
-                            val rawTranslationText = enhancedLine?.translationText
+                            val translationText = enhancedLine?.translationText
                                 ?.trim()
                                 ?.takeIf { it.isNotEmpty() }
                                 ?: visibleLine.translationLine?.text
                                     ?.trim()
                                     ?.takeIf { it.isNotEmpty() }
-                            // 定制改动：译文显示开关
-                            val translationText = rawTranslationText.takeIf { showLyricsTranslation }
                             val distance = if (activeHighlightedVisibleIndex >= 0) {
                                 abs(index - activeHighlightedVisibleIndex)
                             } else {
@@ -376,17 +369,16 @@ internal fun PlayerLyricsPane(
                                 pure && activeHighlightedVisibleIndex < 0 -> 0.48f
                                 activeHighlightedVisibleIndex < 0 -> 0.6f
                                 distance == 0 -> 1f
-                                pure && distance == 1 -> 0.52f
-                                // 定制改动：拉开当前行与相邻行的对比，当前行更跳出来
-                                distance == 1 -> 0.60f
-                                pure && distance == 2 -> 0.32f
-                                distance == 2 -> 0.40f
-                                pure -> 0.20f
-                                else -> 0.28f
+                                pure && distance == 1 -> 0.58f
+                                distance == 1 -> 0.72f
+                                pure && distance == 2 -> 0.38f
+                                distance == 2 -> 0.5f
+                                pure -> 0.22f
+                                else -> 0.34f
                             }
                             val targetScale = when {
                                 highlightedVisibleIndex < 0 -> 1f
-                                distance == 0 -> 1.14f
+                                distance == 0 -> 1.08f
                                 distance == 1 -> 1.01f
                                 else -> 1f
                             }
@@ -399,29 +391,8 @@ internal fun PlayerLyricsPane(
                                     lyricsPrimaryTextColor
                                 },
                             )
-                            // 定制改动：点击歌词行直接跳到这一句
-                            val lineSeekPositionMs = line.timestampMs?.let { rawTimestampMs ->
-                                (rawTimestampMs + lyrics.offsetMs)
-                                    .coerceAtLeast(0L)
-                                    .coerceAtMost(
-                                        state.snapshot.durationMs.takeIf { it > 0L } ?: Long.MAX_VALUE
-                                    )
-                            }
                             val lineModifier = Modifier
                                 .fillMaxWidth()
-                                .then(
-                                    if (lineSeekPositionMs == null) {
-                                        Modifier
-                                    } else {
-                                        Modifier.clickable(
-                                            interactionSource = remember { MutableInteractionSource() },
-                                            indication = null,
-                                        ) {
-                                            isLyricsBrowsing = false
-                                            onPlayerIntent(PlayerIntent.SeekTo(lineSeekPositionMs))
-                                        }
-                                    },
-                                )
                                 .graphicsLayer(
                                     alpha = animatedAlpha,
                                     scaleX = animatedScale,
@@ -429,27 +400,6 @@ internal fun PlayerLyricsPane(
                                 )
                             val isHighlighted = index == activeHighlightedVisibleIndex
                             val hasEnhancedSegments = enhancedLine?.segments?.isNotEmpty() == true
-                            // 定制改动：歌词字号档位
-                            val fontSizeScale = when (lyricsFontSizeLevel) {
-                                0 -> 0.86f
-                                2 -> 1.18f
-                                3 -> 1.34f
-                                else -> 1f
-                            }
-                            val primaryLineStyle = if (isHighlighted) {
-                                MaterialTheme.typography.headlineSmall
-                            } else {
-                                MaterialTheme.typography.titleLarge
-                            }
-                            val secondaryLineStyle = if (isHighlighted) {
-                                MaterialTheme.typography.titleMedium
-                            } else {
-                                MaterialTheme.typography.bodyLarge
-                            }
-                            val scaledPrimaryLineStyle =
-                                primaryLineStyle.copy(fontSize = primaryLineStyle.fontSize * fontSizeScale)
-                            val scaledSecondaryLineStyle =
-                                secondaryLineStyle.copy(fontSize = secondaryLineStyle.fontSize * fontSizeScale)
                             if (translationText != null) {
                                 Column(
                                     modifier = lineModifier,
@@ -461,7 +411,7 @@ internal fun PlayerLyricsPane(
                                             currentPositionMs = activeLyricsPositionMs,
                                             activeColor = animatedColor,
                                             inactiveColor = lyricsSecondaryTextColor.copy(alpha = 0.78f),
-                                            style = scaledPrimaryLineStyle,
+                                            style = MaterialTheme.typography.headlineSmall,
                                             textAlign = TextAlign.Start,
                                             fontWeight = FontWeight.Bold,
                                             modifier = Modifier.fillMaxWidth(),
@@ -469,7 +419,7 @@ internal fun PlayerLyricsPane(
                                     } else {
                                         Text(
                                             text = line.text,
-                                            style = scaledPrimaryLineStyle,
+                                            style = if (isHighlighted) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleLarge,
                                             color = animatedColor,
                                             textAlign = TextAlign.Start,
                                             fontWeight = if (isHighlighted) FontWeight.Bold else FontWeight.Normal,
@@ -478,7 +428,7 @@ internal fun PlayerLyricsPane(
                                     }
                                     Text(
                                         text = translationText,
-                                        style = scaledSecondaryLineStyle,
+                                        style = if (isHighlighted) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyLarge,
                                         // 定制改动：未高亮译文透明度 0.72 -> 0.84，小屏上更清楚
                                         color = lyricsSecondaryTextColor.copy(alpha = if (isHighlighted) 0.92f else 0.84f),
                                         textAlign = TextAlign.Start,
@@ -492,7 +442,7 @@ internal fun PlayerLyricsPane(
                                     currentPositionMs = activeLyricsPositionMs,
                                     activeColor = animatedColor,
                                     inactiveColor = lyricsSecondaryTextColor.copy(alpha = 0.78f),
-                                    style = scaledPrimaryLineStyle,
+                                    style = MaterialTheme.typography.headlineSmall,
                                     textAlign = TextAlign.Start,
                                     fontWeight = FontWeight.Bold,
                                     modifier = lineModifier,
@@ -500,68 +450,13 @@ internal fun PlayerLyricsPane(
                             } else {
                                 Text(
                                     text = line.text,
-                                    style = scaledPrimaryLineStyle,
+                                    style = if (isHighlighted) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleLarge,
                                     color = animatedColor,
                                     textAlign = TextAlign.Start,
                                     fontWeight = if (isHighlighted) FontWeight.Bold else FontWeight.Normal,
                                     modifier = lineModifier,
                                 )
                             }
-                        }
-                    }
-                    // 定制改动：歌词显示设置（字号档位 + 译文开关）
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(end = if (compact) 0.dp else 6.dp),
-                    ) {
-                        IconButton(onClick = { showLyricsOptionsMenu = true }) {
-                            Icon(
-                                imageVector = Icons.Rounded.TextFields,
-                                contentDescription = "歌词显示设置",
-                                tint = Color.White.copy(alpha = 0.62f),
-                                modifier = Modifier.size(20.dp),
-                            )
-                        }
-                        DropdownMenu(
-                            expanded = showLyricsOptionsMenu,
-                            onDismissRequest = { showLyricsOptionsMenu = false },
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text("字号：小${if (lyricsFontSizeLevel == 0) "  ✓" else ""}") },
-                                onClick = {
-                                    lyricsFontSizeLevel = 0
-                                    showLyricsOptionsMenu = false
-                                },
-                            )
-                            DropdownMenuItem(
-                                text = { Text("字号：标准${if (lyricsFontSizeLevel == 1) "  ✓" else ""}") },
-                                onClick = {
-                                    lyricsFontSizeLevel = 1
-                                    showLyricsOptionsMenu = false
-                                },
-                            )
-                            DropdownMenuItem(
-                                text = { Text("字号：大${if (lyricsFontSizeLevel == 2) "  ✓" else ""}") },
-                                onClick = {
-                                    lyricsFontSizeLevel = 2
-                                    showLyricsOptionsMenu = false
-                                },
-                            )
-                            DropdownMenuItem(
-                                text = { Text("字号：特大${if (lyricsFontSizeLevel == 3) "  ✓" else ""}") },
-                                onClick = {
-                                    lyricsFontSizeLevel = 3
-                                    showLyricsOptionsMenu = false
-                                },
-                            )
-                            DropdownMenuItem(
-                                text = { Text(if (showLyricsTranslation) "隐藏译文" else "显示译文") },
-                                onClick = {
-                                    showLyricsTranslation = !showLyricsTranslation
-                                    showLyricsOptionsMenu = false
-                                },
-                            )
                         }
                     }
                     if (isLyricsBrowsing && browseSeekPositionMs != null) {
