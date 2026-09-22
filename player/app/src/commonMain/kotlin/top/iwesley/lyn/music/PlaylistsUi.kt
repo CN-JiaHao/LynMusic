@@ -121,6 +121,9 @@ import top.iwesley.lyn.music.feature.playlists.PlaylistsState
 import top.iwesley.lyn.music.platform.PlatformBackHandler
 import top.iwesley.lyn.music.ui.mainShellColors
 
+/** 歌单页双栏布局的最小总宽度：低于此值（如竖屏平板）回退单栏。 */
+private val PLAYLISTS_TWO_PANE_MIN_WIDTH = 900.dp
+
 /**
  * 定制改动：歌单列表排序方式。
  *
@@ -782,7 +785,9 @@ internal fun PlaylistsTab(
             platform = currentPlatformDescriptor,
             density = density,
         )
-        val wide = layoutProfile.isExpandedLayout
+        // 定制：双栏（列表+详情）需要足够宽度。竖屏平板扣除 240dp 侧栏后仅剩约 350dp，
+        // 双栏会把歌单列表挤成竖条，因此总宽不足 900dp 时回退为单栏列表/整页详情。
+        val wide = layoutProfile.isExpandedLayout && maxWidth >= PLAYLISTS_TWO_PANE_MIN_WIDTH
         val showPlaylistTrackDuration = !layoutProfile.isCompactLayout
         if (showCreateDialog) {
             PlaylistNameDialog(
