@@ -192,6 +192,7 @@ data class PlaylistEntity(
     val createdLocally: Boolean,
     val createdAt: Long,
     val updatedAt: Long,
+    val customOrder: Int? = null,
 )
 
 @Entity(
@@ -633,6 +634,12 @@ interface PlaylistDao {
 
     @Upsert
     suspend fun upsertAll(items: List<PlaylistEntity>)
+
+    @Query("UPDATE playlist SET customOrder = :orderIndex WHERE id = :playlistId")
+    suspend fun updateCustomOrder(playlistId: String, orderIndex: Int)
+
+    @Query("UPDATE playlist SET customOrder = NULL")
+    suspend fun clearCustomOrder()
 }
 
 @Dao
@@ -841,7 +848,7 @@ interface OfflineDownloadDao {
         OfflineDownloadEntity::class,
         ImportTrackStageEntity::class,
     ],
-    version = 19,
+    version = 20,
 )
 @ConstructedBy(LynMusicDatabaseConstructor::class)
 abstract class LynMusicDatabase : RoomDatabase() {
@@ -892,6 +899,7 @@ fun buildLynMusicDatabase(builder: Builder<LynMusicDatabase>): LynMusicDatabase 
         .addMigrations(MIGRATION_16_17)
         .addMigrations(MIGRATION_17_18)
         .addMigrations(MIGRATION_18_19)
+        .addMigrations(MIGRATION_19_20)
         .build()
 }
 
@@ -1252,5 +1260,16 @@ fun SQLiteConnection.createImportTrackStageTable() {
 private fun SQLiteConnection.execSql(sql: String) {
     prepare(sql).use { statement ->
         statement.step()
+    }
+}
+
+val MIGRATION_19_20: Migration = object : Migration(19, 20) {
+    override fun migrate(connection: SQLiteConnection) {
+        connection.execSql(
+            """
+            ALTER TABLE playlist
+            ADD COLUMN customOrder INTEGER
+            """.trimIndent(),
+        )
     }
 }
