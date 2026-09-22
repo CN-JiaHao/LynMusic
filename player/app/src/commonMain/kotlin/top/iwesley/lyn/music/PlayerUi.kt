@@ -527,7 +527,10 @@ private fun MiniPlayerBar(
             ) {
                 Text(
                     text = snapshot.currentDisplayTitle,
-                    modifier = Modifier.widthIn(max = if (compact) 120.dp else 180.dp),
+                    // 定制：改为弹性宽度并让时长文本优先显示，避免窄屏下时长被裁剪成"0"
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .widthIn(max = if (compact) 120.dp else 180.dp),
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -543,6 +546,7 @@ private fun MiniPlayerBar(
                     style = MaterialTheme.typography.labelSmall,
                     color = Color.White.copy(alpha = 0.9f),
                     maxLines = 1,
+                    overflow = TextOverflow.Clip,
                 )
             }
             if (miniPlayerLyricsText != null) {
