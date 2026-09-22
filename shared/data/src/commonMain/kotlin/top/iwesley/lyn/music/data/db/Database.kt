@@ -195,6 +195,12 @@ data class PlaylistEntity(
     val customOrder: Int? = null,
 )
 
+@Entity(tableName = "playlist_preference")
+data class PlaylistPreferenceEntity(
+    @PrimaryKey val prefKey: String,
+    val prefValue: String,
+)
+
 @Entity(
     tableName = "playlist_track",
     primaryKeys = ["playlistId", "trackId"],
@@ -643,6 +649,15 @@ interface PlaylistDao {
 }
 
 @Dao
+interface PlaylistPreferenceDao {
+    @Query("SELECT prefValue FROM playlist_preference WHERE prefKey = :prefKey LIMIT 1")
+    fun observeValue(prefKey: String): Flow<String?>
+
+    @Upsert
+    suspend fun upsert(item: PlaylistPreferenceEntity)
+}
+
+@Dao
 interface PlaylistTrackDao {
     @Query("SELECT * FROM playlist_track")
     fun observeAll(): Flow<List<PlaylistTrackEntity>>
@@ -847,8 +862,9 @@ interface OfflineDownloadDao {
         LyricsCacheEntity::class,
         OfflineDownloadEntity::class,
         ImportTrackStageEntity::class,
+        PlaylistPreferenceEntity::class,
     ],
-    version = 20,
+    version = 21,
 )
 @ConstructedBy(LynMusicDatabaseConstructor::class)
 abstract class LynMusicDatabase : RoomDatabase() {
@@ -870,6 +886,7 @@ abstract class LynMusicDatabase : RoomDatabase() {
     abstract fun workflowLyricsSourceConfigDao(): WorkflowLyricsSourceConfigDao
     abstract fun lyricsCacheDao(): LyricsCacheDao
     abstract fun offlineDownloadDao(): OfflineDownloadDao
+    abstract fun playlistPreferenceDao(): PlaylistPreferenceDao
 }
 
 @Suppress("KotlinNoActualForExpect")
@@ -900,6 +917,7 @@ fun buildLynMusicDatabase(builder: Builder<LynMusicDatabase>): LynMusicDatabase 
         .addMigrations(MIGRATION_17_18)
         .addMigrations(MIGRATION_18_19)
         .addMigrations(MIGRATION_19_20)
+        .addMigrations(MIGRATION_20_21)
         .build()
 }
 
@@ -1269,6 +1287,20 @@ val MIGRATION_19_20: Migration = object : Migration(19, 20) {
             """
             ALTER TABLE playlist
             ADD COLUMN customOrder INTEGER
+            """.trimIndent(),
+        )
+    }
+}
+
+val MIGRATION_20_21: Migration = object : Migration(20, 21) {
+    override fun migrate(connection: SQLiteConnection) {
+        connection.execSql(
+            """
+            CREATE TABLE IF NOT EXISTS playlist_preference (
+                prefKey TEXT NOT NULL,
+                prefValue TEXT NOT NULL,
+                PRIMARY KEY(prefKey)
+            )
             """.trimIndent(),
         )
     }
