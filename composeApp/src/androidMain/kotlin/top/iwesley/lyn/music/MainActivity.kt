@@ -86,10 +86,16 @@ class MainActivity : ComponentActivity() {
                 val appDisplayScalePreset by appComponent.appDisplayScalePreset.collectAsState()
                 ProvideFixedAndroidComposeDensity(appDisplayScalePreset = appDisplayScalePreset) {
                     AndroidMainShellSystemBars(appComponent)
-                    App(
-                        component = appComponent,
-                        startupAutoOpenGate = startupAutoOpenViewModel.gate,
-                    )
+                    CompositionLocalProvider(
+                        LocalSystemVolumeController provides remember {
+                            AndroidSystemVolumeController(this@MainActivity)
+                        },
+                    ) {
+                        App(
+                            component = appComponent,
+                            startupAutoOpenGate = startupAutoOpenViewModel.gate,
+                        )
+                    }
                 }
             } else {
                 StartupDatabaseErrorScreen(
