@@ -984,10 +984,12 @@ private fun GeneralSettingsPane(
                                         onSettingsIntent(SettingsIntent.PlayerArtworkStyleChanged(style))
                                     },
                                     modifier = Modifier.weight(1f),
+                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp),
                                 ) {
                                     Text(
                                         text = playerArtworkStyleLabel(style),
-                                        maxLines = 1,
+                                        style = MaterialTheme.typography.labelLarge,
+                                        maxLines = 2,
                                         overflow = TextOverflow.Ellipsis,
                                     )
                                 }
@@ -997,10 +999,12 @@ private fun GeneralSettingsPane(
                                         onSettingsIntent(SettingsIntent.PlayerArtworkStyleChanged(style))
                                     },
                                     modifier = Modifier.weight(1f),
+                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp),
                                 ) {
                                     Text(
                                         text = playerArtworkStyleLabel(style),
-                                        maxLines = 1,
+                                        style = MaterialTheme.typography.labelLarge,
+                                        maxLines = 2,
                                         overflow = TextOverflow.Ellipsis,
                                     )
                                 }
@@ -2576,9 +2580,9 @@ internal fun shouldShowMacOsWindowCloseBehaviorSetting(platform: PlatformDescrip
 internal fun navidromeAudioQualityLabel(quality: NavidromeAudioQuality): String {
     return when (quality) {
         NavidromeAudioQuality.Original -> "原始"
-        NavidromeAudioQuality.Kbps320 -> "320kbps"
-        NavidromeAudioQuality.Kbps192 -> "192kbps"
-        NavidromeAudioQuality.Kbps128 -> "128kbps"
+        NavidromeAudioQuality.Kbps320 -> "320k"
+        NavidromeAudioQuality.Kbps192 -> "192k"
+        NavidromeAudioQuality.Kbps128 -> "128k"
     }
 }
 
