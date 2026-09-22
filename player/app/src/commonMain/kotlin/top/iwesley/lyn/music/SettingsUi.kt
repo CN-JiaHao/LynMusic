@@ -2655,7 +2655,7 @@ private fun deviceInfoMemoryValue(totalMemoryBytes: Long?, loading: Boolean): St
         ?: if (loading) "正在读取..." else "不可用"
 }
 
-private const val ABOUT_APP_NAME = "LynMusic"
+private const val ABOUT_APP_NAME = "Music"
 private const val ABOUT_APP_SUMMARY =
     "以下为版本与运行环境信息。"
 private const val ABOUT_APP_DEVELOPER = "锋风"
