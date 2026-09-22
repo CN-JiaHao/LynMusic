@@ -253,7 +253,7 @@ internal fun SettingsTab(
                         sections = availableSections,
                         selectedSection = desktopSelectedSection,
                         desktop = true,
-                        showAppUpdateBadge = state.appUpdateHasNewVersion == true,
+                        showAppUpdateBadge = false, // 定制：自用版不显示更新红点
                         onSectionSelected = { section ->
                             desktopSelectedSectionName = section.name
                         },
@@ -347,7 +347,7 @@ internal fun SettingsTab(
                             sections = availableSections,
                             selectedSection = null,
                             desktop = false,
-                            showAppUpdateBadge = state.appUpdateHasNewVersion == true,
+                            showAppUpdateBadge = false, // 定制：自用版不显示更新红点
                             onSectionSelected = { section ->
                                 desktopSelectedSectionName = section.name
                                 mobileDetailSectionName = section.name
@@ -1826,7 +1826,7 @@ private fun settingsSectionSubtitle(section: SettingsSection): String {
         SettingsSection.Lyrics -> "配置歌词 API、搜索源和播放缓存。"
         SettingsSection.Storage -> "查看并清理缓存占用。"
         SettingsSection.AboutDevice -> "查看系统、屏幕和硬件信息。"
-        SettingsSection.AboutApp -> "查看开发者、项目地址和公众号信息。"
+        SettingsSection.AboutApp -> "查看版本与运行环境信息。"
         SettingsSection.Help -> "查看投屏和后台运行常见问题。"
     }
 }
@@ -2016,8 +2016,6 @@ private fun AboutAppSettingsPane(
 ) {
     val shellColors = mainShellColors
     val uriHandler = LocalUriHandler.current
-    val appUpdateUiModel = state.toAppUpdateUiModel()
-    val appUpdateChecking = appUpdateUiModel.status == AppUpdateUiStatus.Checking
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -2028,7 +2026,7 @@ private fun AboutAppSettingsPane(
         if (showHeading) {
             SectionTitle(
                 title = "关于应用",
-                subtitle = "查看开发者、项目地址和公众号信息。",
+                subtitle = "查看版本与运行环境信息。",
             )
         }
         MainShellElevatedCard(shape = RoundedCornerShape(28.dp)) {
@@ -2062,126 +2060,6 @@ private fun AboutAppSettingsPane(
                 label = "编译时间",
                 value = BuildMetadata.buildTimeUtc,
                 monospace = true,
-            )
-        }
-        AboutDeviceInfoCard(title = "版本更新") {
-            when (appUpdateUiModel.status) {
-                AppUpdateUiStatus.Checking -> {
-                    Text(
-                        text = appUpdateUiModel.message.orEmpty(),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = shellColors.secondaryText,
-                    )
-                }
-
-                AppUpdateUiStatus.Error -> {
-                    Text(
-                        text = appUpdateUiModel.message.orEmpty(),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
-
-                AppUpdateUiStatus.UpdateAvailable -> {
-                    AboutAppFieldRow(
-                        label = "最新版本",
-                        value = appUpdateUiModel.latestVersion.orEmpty(),
-                        monospace = true,
-                    )
-                    Text(
-                        text = appUpdateUiModel.message.orEmpty(),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = shellColors.secondaryText,
-                    )
-                }
-
-                AppUpdateUiStatus.UpToDate -> {
-                    Text(
-                        text = appUpdateUiModel.message.orEmpty(),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = shellColors.secondaryText,
-                    )
-                }
-
-                AppUpdateUiStatus.Idle -> Unit
-            }
-            appUpdateUiModel.errorMessage?.let { errorMessage ->
-                Text(
-                    text = errorMessage,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
-            Column(
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                OutlinedButton(
-                    onClick = { onSettingsIntent(SettingsIntent.CheckAppUpdate) },
-                    enabled = !appUpdateChecking,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    if (appUpdateChecking) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(16.dp),
-                            strokeWidth = 2.dp,
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Rounded.Sync,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                        )
-                    }
-                    Spacer(Modifier.width(8.dp))
-                    Text(if (appUpdateChecking) "检查中" else "检查更新")
-                }
-                if (appUpdateUiModel.status == AppUpdateUiStatus.UpdateAvailable) {
-                    Button(
-                        onClick = {
-                            uriHandler.openUri(appUpdateUiModel.downloadUrl)
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text("打开下载页")
-                    }
-                }
-            }
-        }
-        AboutDeviceInfoCard(title = "开发者") {
-            AboutAppFieldRow(
-                label = "名称",
-                value = ABOUT_APP_DEVELOPER,
-            )
-        }
-        AboutDeviceInfoCard(title = "项目地址") {
-            AboutAppLinkFieldRow(
-                label = "地址",
-                value = LynMusicUpdateLinks.PROJECT_URL,
-                url = LynMusicUpdateLinks.PROJECT_URL,
-            )
-        }
-        AboutDeviceInfoCard(title = "微信公众号") {
-            AboutAppFieldRow(
-                label = "账号",
-                value = ABOUT_APP_WECHAT_ACCOUNT,
-            )
-            Text(
-                text = "公众号二维码",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            AboutAppQrImage(
-                modifier = Modifier
-                    .fillMaxWidth(0.58f)
-                    .widthIn(max = 220.dp)
-                    .aspectRatio(1f)
-                    .align(Alignment.CenterHorizontally),
-            )
-            Text(
-                text = "扫码关注公众号，获取更新和交流信息。",
-                style = MaterialTheme.typography.bodySmall,
-                color = shellColors.secondaryText,
             )
         }
     }
@@ -2779,7 +2657,7 @@ private fun deviceInfoMemoryValue(totalMemoryBytes: Long?, loading: Boolean): St
 
 private const val ABOUT_APP_NAME = "LynMusic"
 private const val ABOUT_APP_SUMMARY =
-    "以下为开发者、项目地址和公众号信息。"
+    "以下为版本与运行环境信息。"
 private const val ABOUT_APP_DEVELOPER = "锋风"
 private const val ABOUT_APP_WECHAT_ACCOUNT = "锋风"
 
