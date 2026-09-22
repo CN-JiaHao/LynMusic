@@ -8,6 +8,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -404,6 +405,11 @@ interface PlaylistRepository {
     suspend fun refreshNavidromePlaylists(): Result<Unit>
     suspend fun reorderPlaylists(orderedPlaylistIds: List<String>): Result<Unit>
     suspend fun clearPlaylistCustomOrder(): Result<Unit>
+
+    val playlistSortMode: Flow<String?>
+        get() = flowOf(null)
+
+    suspend fun setPlaylistSortMode(mode: String) = Unit
 }
 
 data class PlaylistImportReport(
