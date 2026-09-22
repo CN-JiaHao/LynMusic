@@ -114,6 +114,38 @@ import top.iwesley.lyn.music.feature.playlists.PlaylistsState
 import top.iwesley.lyn.music.platform.PlatformBackHandler
 import top.iwesley.lyn.music.ui.mainShellColors
 
+/**
+ * 定制改动：歌单列表排序方式。
+ *
+ * 原实现里歌单列表直接使用服务端返回的顺序，没有任何排序入口，
+ * 只有「添加到歌单」弹窗内部按更新时间排了一次。
+ * 这里给歌单列表补一个排序切换，纯本地显示层排序，不写回服务端。
+ */
+internal enum class PlaylistSortMode(val label: String) {
+    SERVER("服务端顺序"),
+    UPDATED("最近更新"),
+    NAME("名称"),
+    TRACK_COUNT("歌曲数"),
+}
+
+internal fun sortPlaylistSummaries(
+    playlists: List<PlaylistSummary>,
+    mode: PlaylistSortMode,
+): List<PlaylistSummary> = when (mode) {
+    PlaylistSortMode.SERVER -> playlists
+    PlaylistSortMode.UPDATED -> playlists.sortedWith(
+        compareByDescending<PlaylistSummary> { it.updatedAt }.thenBy { it.name.lowercase() }
+    )
+
+    PlaylistSortMode.NAME -> playlists.sortedWith(
+        compareBy<PlaylistSummary> { it.name.lowercase() }
+    )
+
+    PlaylistSortMode.TRACK_COUNT -> playlists.sortedWith(
+        compareByDescending<PlaylistSummary> { it.trackCount }.thenBy { it.name.lowercase() }
+    )
+}
+
 fun buildPlaylistAddTargets(
     playlists: List<PlaylistSummary>,
     favoriteTrackIds: Set<String>,
@@ -664,8 +696,12 @@ internal fun PlaylistsTab(
     } else {
         state.isRefreshing
     }
-    val filteredPlaylists = remember(playlists, playlistSearchQuery) {
-        filterMobileLibraryHubPlaylists(playlists, playlistSearchQuery)
+    var playlistSortMode by rememberSaveable { mutableStateOf(PlaylistSortMode.SERVER) }
+    val filteredPlaylists = remember(playlists, playlistSearchQuery, playlistSortMode) {
+        sortPlaylistSummaries(
+            filterMobileLibraryHubPlaylists(playlists, playlistSearchQuery),
+            playlistSortMode,
+        )
     }
     val isFilteringPlaylists = playlistSearchQuery.isNotBlank() && playlists.isNotEmpty()
     PlatformBackHandler(
@@ -788,6 +824,8 @@ internal fun PlaylistsTab(
                     isFilteringByQuery = isFilteringPlaylists,
                     showRefreshActionButton = showRefreshActionButton,
                     showSourceFilterActionButton = showSourceFilterActionButton,
+                    playlistSortMode = playlistSortMode,
+                    onSortModeChanged = { playlistSortMode = it },
                     onRefresh = {
                         if (isOnlineMode) {
                             onOnlineIntent(OnlinePlaylistsIntent.Refresh)
@@ -881,6 +919,8 @@ internal fun PlaylistsTab(
                 isFilteringByQuery = isFilteringPlaylists,
                 showRefreshActionButton = showRefreshActionButton,
                 showSourceFilterActionButton = showSourceFilterActionButton,
+                playlistSortMode = playlistSortMode,
+                onSortModeChanged = { playlistSortMode = it },
                 onRefresh = {
                     if (isOnlineMode) {
                         onOnlineIntent(OnlinePlaylistsIntent.Refresh)
@@ -1002,6 +1042,8 @@ private fun PlaylistListPane(
     isFilteringByQuery: Boolean = false,
     showRefreshActionButton: Boolean = true,
     showSourceFilterActionButton: Boolean = true,
+    playlistSortMode: PlaylistSortMode,
+    onSortModeChanged: (PlaylistSortMode) -> Unit,
     onRefresh: () -> Unit,
     onSourceFilterChanged: (LibrarySourceFilter) -> Unit,
     onOnlineSourceSelected: (String) -> Unit = {},
@@ -1012,6 +1054,7 @@ private fun PlaylistListPane(
     modifier: Modifier = Modifier,
 ) {
     var sourceFilterMenuExpanded by remember { mutableStateOf(false) }
+    var sortMenuExpanded by remember { mutableStateOf(false) }
     val mobilePlatform = currentPlatformDescriptor.isMobilePlatform()
     var menuPlaylistId by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingRenamePlaylistId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -1117,6 +1160,33 @@ private fun PlaylistListPane(
                                         },
                                     )
                                 }
+                            }
+                        }
+                    }
+
+                    Box {
+                        OutlinedButton(onClick = { sortMenuExpanded = true }) {
+                            Icon(Icons.Rounded.Tune, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = 排序： + playlistSortMode.label,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = sortMenuExpanded,
+                            onDismissRequest = { sortMenuExpanded = false },
+                            containerColor = mainShellColors.navContainer,
+                        ) {
+                            PlaylistSortMode.values().forEach { mode ->
+                                DropdownMenuItem(
+                                    text = { Text(mode.label) },
+                                    onClick = {
+                                        sortMenuExpanded = false
+                                        onSortModeChanged(mode)
+                                    },
+                                )
                             }
                         }
                     }
