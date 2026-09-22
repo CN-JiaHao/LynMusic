@@ -50,6 +50,8 @@ sealed interface PlaylistsIntent {
     data class ImportPlaylistText(val playlistId: String, val text: String) : PlaylistsIntent
     data class RemoveTrackFromPlaylist(val playlistId: String, val trackId: String) : PlaylistsIntent
     data object Refresh : PlaylistsIntent
+    data class ReorderPlaylists(val orderedPlaylistIds: List<String>) : PlaylistsIntent
+    data object ClearPlaylistCustomOrder : PlaylistsIntent
     data object ClearPlaylistImportReport : PlaylistsIntent
     data object ClearMessage : PlaylistsIntent
 }
@@ -154,7 +156,23 @@ class PlaylistsStore(
             is PlaylistsIntent.AddTrackToPlaylist -> addTrackToPlaylist(intent.playlistId, intent.track)
             is PlaylistsIntent.ImportPlaylistText -> importPlaylistText(intent.playlistId, intent.text)
             is PlaylistsIntent.RemoveTrackFromPlaylist -> removeTrackFromPlaylist(intent.playlistId, intent.trackId)
+            is PlaylistsIntent.ReorderPlaylists -> reorderPlaylists(intent.orderedPlaylistIds)
+            PlaylistsIntent.ClearPlaylistCustomOrder -> clearPlaylistCustomOrder()
         }
+    }
+
+    private suspend fun reorderPlaylists(orderedPlaylistIds: List<String>) {
+        playlistRepository.reorderPlaylists(orderedPlaylistIds)
+            .onFailure { throwable ->
+                updateState { it.copy(message = throwable.message.orEmpty().ifBlank { "歌单排序保存失败。" }) }
+            }
+    }
+
+    private suspend fun clearPlaylistCustomOrder() {
+        playlistRepository.clearPlaylistCustomOrder()
+            .onFailure { throwable ->
+                updateState { it.copy(message = throwable.message.orEmpty().ifBlank { "歌单排序重置失败。" }) }
+            }
     }
 
     private fun observeSelectedPlaylist(playlistId: String?) {
