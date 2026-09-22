@@ -42,6 +42,7 @@ import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.DragHandle
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material.icons.rounded.Tune
@@ -1281,7 +1282,7 @@ private fun PlaylistListPane(
                             mobilePlatform = mobilePlatform,
                             menuExpanded = menuPlaylistId == playlist.id,
                             showDragHandle = canDragPlaylists,
-                            dragHandleModifier = Modifier.pointerInput(canDragPlaylists) {
+                            dragModifier = Modifier.pointerInput(canDragPlaylists) {
                                 if (!canDragPlaylists) return@pointerInput
                                 detectDragGesturesAfterLongPress(
                                     onDragStart = {
@@ -1317,7 +1318,11 @@ private fun PlaylistListPane(
                                     },
                                 )
                             },
-                            onClick = { onSelect(playlist.id) },
+                            onClick = {
+                                if (draggingPlaylistId == null) {
+                                    onSelect(playlist.id)
+                                }
+                            },
                             onOpenMenu = { menuPlaylistId = playlist.id },
                             onDismissMenu = {
                                 if (menuPlaylistId == playlist.id) {
@@ -1376,6 +1381,47 @@ private fun PlaylistListPane(
 }
 
 @Composable
+private fun PlaylistCardActionsMenu(
+    expanded: Boolean,
+    onDismissRequest: () -> Unit,
+    onRequestRename: () -> Unit,
+    onRequestDelete: () -> Unit,
+) {
+    DropdownMenu(
+        expanded = expanded,
+        onDismissRequest = onDismissRequest,
+        containerColor = mainShellColors.navContainer,
+    ) {
+        DropdownMenuItem(
+            text = { Text("重命名") },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Rounded.Edit,
+                    contentDescription = null,
+                )
+            },
+            onClick = onRequestRename,
+        )
+        DropdownMenuItem(
+            text = {
+                Text(
+                    text = "删除歌单",
+                    color = MaterialTheme.colorScheme.error,
+                )
+            },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Rounded.Delete,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                )
+            },
+            onClick = onRequestDelete,
+        )
+    }
+}
+
+@Composable
 @OptIn(ExperimentalFoundationApi::class)
 private fun PlaylistSummaryCard(
     playlist: PlaylistSummary,
@@ -1383,7 +1429,7 @@ private fun PlaylistSummaryCard(
     mobilePlatform: Boolean,
     menuExpanded: Boolean,
     showDragHandle: Boolean = false,
-    dragHandleModifier: Modifier = Modifier,
+    dragModifier: Modifier = Modifier,
     onClick: () -> Unit,
     onOpenMenu: () -> Unit,
     onDismissMenu: () -> Unit,
@@ -1393,10 +1439,15 @@ private fun PlaylistSummaryCard(
     val shellColors = mainShellColors
     val cardShape = RoundedCornerShape(24.dp)
     val interactionModifier = if (mobilePlatform) {
-        Modifier.combinedClickable(
-            onClick = onClick,
-            onLongClick = onOpenMenu,
-        )
+        if (showDragHandle) {
+            // 自定义排序模式下长按交给拖拽手势，菜单改由右上角“更多”按钮打开
+            Modifier.clickable(onClick = onClick)
+        } else {
+            Modifier.combinedClickable(
+                onClick = onClick,
+                onLongClick = onOpenMenu,
+            )
+        }
     } else {
         Modifier
             .pointerInput(onOpenMenu) {
@@ -1413,7 +1464,11 @@ private fun PlaylistSummaryCard(
             .clickable(onClick = onClick)
     }
 
-    Box(modifier = Modifier.fillMaxWidth()) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(dragModifier),
+    ) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1460,52 +1515,45 @@ private fun PlaylistSummaryCard(
                     )
                 }
                 if (showDragHandle) {
+                    Box {
+                        IconButton(onClick = onOpenMenu) {
+                            Icon(
+                                imageVector = Icons.Rounded.MoreVert,
+                                contentDescription = "更多操作",
+                                tint = if (selected) {
+                                    MaterialTheme.colorScheme.onSecondary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                            )
+                        }
+                        PlaylistCardActionsMenu(
+                            expanded = menuExpanded,
+                            onDismissRequest = onDismissMenu,
+                            onRequestRename = onRequestRename,
+                            onRequestDelete = onRequestDelete,
+                        )
+                    }
                     Icon(
                         imageVector = Icons.Rounded.DragHandle,
-                        contentDescription = "拖动调整顺序",
+                        contentDescription = "长按卡片拖动调整顺序",
                         tint = if (selected) {
                             MaterialTheme.colorScheme.onSecondary
                         } else {
                             MaterialTheme.colorScheme.onSurfaceVariant
                         },
-                        modifier = Modifier
-                            .size(32.dp)
-                            .then(dragHandleModifier),
+                        modifier = Modifier.size(32.dp),
                     )
                 }
             }
         }
 
-        DropdownMenu(
-            expanded = menuExpanded,
-            onDismissRequest = onDismissMenu,
-            containerColor = shellColors.navContainer,
-        ) {
-            DropdownMenuItem(
-                text = { Text("重命名") },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Rounded.Edit,
-                        contentDescription = null,
-                    )
-                },
-                onClick = onRequestRename,
-            )
-            DropdownMenuItem(
-                text = {
-                    Text(
-                        text = "删除歌单",
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Rounded.Delete,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.error,
-                    )
-                },
-                onClick = onRequestDelete,
+        if (!showDragHandle) {
+            PlaylistCardActionsMenu(
+                expanded = menuExpanded,
+                onDismissRequest = onDismissMenu,
+                onRequestRename = onRequestRename,
+                onRequestDelete = onRequestDelete,
             )
         }
     }
