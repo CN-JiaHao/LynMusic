@@ -402,6 +402,8 @@ interface PlaylistRepository {
     suspend fun importPlaylistText(playlistId: String, text: String): Result<PlaylistImportReport>
     suspend fun removeTrackFromPlaylist(playlistId: String, trackId: String): Result<Unit>
     suspend fun refreshNavidromePlaylists(): Result<Unit>
+    suspend fun reorderPlaylists(orderedPlaylistIds: List<String>): Result<Unit>
+    suspend fun clearPlaylistCustomOrder(): Result<Unit>
 }
 
 data class PlaylistImportReport(
