@@ -2,6 +2,7 @@ package top.iwesley.lyn.music
 
 import android.content.Intent
 import android.content.pm.ActivityInfo
+import android.content.res.Configuration
 import android.graphics.Color
 import android.os.Bundle
 import android.os.Build
@@ -45,6 +46,7 @@ class MainActivity : ComponentActivity() {
     private var pendingExternalAudioOpenIntent: Intent? = null
     private var externalAudioOpenJob: Job? = null
     private var externalAudioOpenRequestId = 0L
+    internal var pendingSystemBarStyle: SystemBarStyle = SystemBarStyle.dark(Color.TRANSPARENT)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge(
@@ -112,8 +114,16 @@ class MainActivity : ComponentActivity() {
         handleExternalAudioOpenIntent(intent)
     }
 
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        // 定制改动：旋转不再重建 Activity，edge-to-edge 的窗口属性需要自己重新应用，
+        // 否则横竖屏切换后状态栏/导航栏的透明与图标配色会回退，看起来像"状态栏不见了"。
+        applyEdgeToEdgeSystemBars(pendingSystemBarStyle)
+    }
+
     override fun onResume() {
         super.onResume()
+        applyEdgeToEdgeSystemBars(pendingSystemBarStyle)
         appComponent?.settingsStore?.dispatch(SettingsIntent.RecheckDesktopLyricsPermission)
     }
 
@@ -168,16 +178,23 @@ private fun MainActivity.AndroidMainShellSystemBars(
     val useDarkSystemBarIcons = !playerState.isExpanded && textPalette == AppThemeTextPalette.Black
 
     SideEffect {
-        val transparent = Color.TRANSPARENT
-        val systemBarStyle = if (useDarkSystemBarIcons) {
-            SystemBarStyle.light(transparent, transparent)
+        pendingSystemBarStyle = if (useDarkSystemBarIcons) {
+            SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
         } else {
-            SystemBarStyle.dark(transparent)
+            SystemBarStyle.dark(Color.TRANSPARENT)
         }
-        enableEdgeToEdge(
-            statusBarStyle = systemBarStyle,
-            navigationBarStyle = systemBarStyle,
-        )
+        applyEdgeToEdgeSystemBars(pendingSystemBarStyle)
+    }
+}
+
+private fun ComponentActivity.applyEdgeToEdgeSystemBars(style: SystemBarStyle) {
+    enableEdgeToEdge(
+        statusBarStyle = style,
+        navigationBarStyle = style,
+    )
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        window.isNavigationBarContrastEnforced = false
+        window.isStatusBarContrastEnforced = false
     }
 }
 
