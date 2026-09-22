@@ -117,6 +117,7 @@ data class PlaylistSummary(
     val memberTrackIds: Set<String> = emptySet(),
     val artworkLocator: String? = null,
     val artworkCacheKey: String? = null,
+    val customOrder: Int? = null,
 )
 
 data class PlaylistDetail(
