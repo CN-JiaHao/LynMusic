@@ -92,6 +92,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import top.iwesley.lyn.music.core.model.DEFAULT_LYRICS_SHARE_FONT_KEY
 import top.iwesley.lyn.music.core.model.LyricsDocument
 import top.iwesley.lyn.music.core.model.LyricsSearchCandidate
@@ -243,10 +244,10 @@ internal fun PlayerLyricsPane(
             verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {
             if (!compact && !pure) {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     Text(
                         state.snapshot.currentDisplayTitle,
-                        style = MaterialTheme.typography.displaySmall,
+                        style = MaterialTheme.typography.displaySmall.copy(fontSize = 45.sp),
                         fontWeight = FontWeight.ExtraBold,
                         color = lyricsPrimaryTextColor,
                         maxLines = 2,
@@ -541,6 +542,7 @@ private fun PlayerLyricsPlainMetadataRow(
             text = text,
             modifier = Modifier.weight(1f, fill = !showTrackInfo),
             color = secondaryTextColor,
+            style = MaterialTheme.typography.bodyLarge.copy(fontSize = 24.sp),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -548,6 +550,8 @@ private fun PlayerLyricsPlainMetadataRow(
             PlayerTrackInfoButton(
                 tint = secondaryTextColor,
                 onClick = onShowTrackInfo,
+                buttonSize = 54.dp,
+                iconSize = 27.dp,
             )
         }
     }
@@ -585,7 +589,7 @@ private fun PlayerLyricsMetadataRow(
     }
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(30.dp),
+        horizontalArrangement = Arrangement.spacedBy(36.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         DesktopLyricsMetadataItem(
@@ -598,7 +602,7 @@ private fun PlayerLyricsMetadataRow(
             target = navigationTargets.artistTarget,
             secondaryTextColor = secondaryTextColor,
             onOpenLibraryNavigationTarget = onOpenLibraryNavigationTarget,
-            modifier = Modifier.widthIn(max = 260.dp),
+            modifier = Modifier.widthIn(max = 390.dp),
         )
         DesktopLyricsMetadataItem(
             label = "专辑：",
@@ -616,6 +620,8 @@ private fun PlayerLyricsMetadataRow(
             PlayerTrackInfoButton(
                 tint = secondaryTextColor,
                 onClick = onShowTrackInfo,
+                buttonSize = 54.dp,
+                iconSize = 27.dp,
             )
         }
     }
@@ -625,15 +631,17 @@ private fun PlayerLyricsMetadataRow(
 private fun PlayerTrackInfoButton(
     tint: Color,
     onClick: () -> Unit,
+    buttonSize: androidx.compose.ui.unit.Dp = 36.dp,
+    iconSize: androidx.compose.ui.unit.Dp = 18.dp,
 ) {
     IconButton(
         onClick = onClick,
-        modifier = Modifier.size(36.dp),
+        modifier = Modifier.size(buttonSize),
     ) {
         Icon(
             imageVector = Icons.Rounded.Info,
             contentDescription = "查看歌曲信息",
-            modifier = Modifier.size(18.dp),
+            modifier = Modifier.size(iconSize),
             tint = tint,
         )
     }
@@ -742,6 +750,7 @@ private fun DesktopLyricsMetadataItem(
         Text(
             text = label,
             color = secondaryTextColor,
+            style = MaterialTheme.typography.bodyLarge.copy(fontSize = 24.sp),
             maxLines = 1,
         )
         Text(
@@ -754,6 +763,7 @@ private fun DesktopLyricsMetadataItem(
                 Modifier
             },
             color = secondaryTextColor,
+            style = MaterialTheme.typography.bodyLarge.copy(fontSize = 24.sp),
             fontWeight = if (target != null) FontWeight.Medium else FontWeight.Normal,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
