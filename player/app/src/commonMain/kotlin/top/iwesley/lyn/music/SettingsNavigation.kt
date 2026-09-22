@@ -18,9 +18,10 @@ internal sealed interface SettingsMobileNavigation {
     data class Detail(val section: SettingsSection) : SettingsMobileNavigation
 }
 
+@Suppress("UNUSED_PARAMETER")
 internal fun settingsSectionsForPlatform(platform: PlatformDescriptor): List<SettingsSection> {
     return SettingsSection.entries.filter { section ->
-        section != SettingsSection.Help || platform.name == ANDROID_PLATFORM_NAME
+        section != SettingsSection.Help
     }
 }
 
