@@ -88,6 +88,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -1292,6 +1293,16 @@ private fun PlayerOverlay(
                 }
             val wide = layoutProfile.isExpandedLayout
             val isPureMode = wide && isPureModeRequested
+            // 定制改动：全屏歌词（纯净模式）进入沉浸式——隐藏状态栏与导航栏，
+            // 从屏幕边缘轻扫可临时唤出；退出纯净模式或离开播放页时恢复。
+            // 非 Android 端走 Noop 默认实现，无副作用。
+            val immersiveSystemBarsController = LocalImmersiveSystemBarsController.current
+            DisposableEffect(immersiveSystemBarsController, isPureMode) {
+                immersiveSystemBarsController.setImmersive(isPureMode)
+                onDispose {
+                    immersiveSystemBarsController.setImmersive(false)
+                }
+            }
             val useTapToRevealLyrics = layoutProfile.isCompactLayout
             val showPhoneEqualizerEntry = showEqualizerEntry &&
                 platform.name == ANDROID_PLATFORM_NAME &&
@@ -1805,12 +1816,12 @@ private fun PlayerBottomControls(
     onOpenLibraryNavigationTarget: (LibraryNavigationTarget) -> Unit,
 ) {
     val favoriteTint = if (isFavorite) Color(0xFFE5484D) else Color.White.copy(alpha = 0.96f)
-    val modeButtonSize = 42.dp
-    val modeIconSize = 22.dp
-    val skipButtonSize = 45.dp
-    val skipIconSize = 27.dp
-    val playButtonSize = 60.dp
-    val playIconSize = 42.dp
+    val modeButtonSize = 52.dp
+    val modeIconSize = 28.dp
+    val skipButtonSize = 56.dp
+    val skipIconSize = 34.dp
+    val playButtonSize = 75.dp
+    val playIconSize = 52.dp
     if (!wide) {
         val navigationTargets = remember(
             mobilePlayback,
