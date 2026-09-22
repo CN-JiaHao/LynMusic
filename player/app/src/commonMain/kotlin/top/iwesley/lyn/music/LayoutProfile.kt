@@ -58,13 +58,19 @@ internal data class LayoutProfile(
     /**
      * 桌面端永远走大屏布局
      * 手机不走大屏布局
-     * 平板走大屏布局
+     * 平板走大屏布局（竖屏同样生效，不再要求横屏）
+     *
+     * 定制改动：原逻辑要求手机平台必须同时满足「最短边 >= 600dp」且「横屏」，
+     * 导致小米平板 7 Ultra 竖屏（约 610dp x 914dp）被当成普通手机，
+     * 播放页只能显示「点击封面才出歌词」的紧凑布局。
+     * 这里去掉横屏限制，平板竖屏即可获得左封面 + 右歌词的双栏大屏布局。
+     * 手机竖屏/横屏最短边仍在 600dp 以下，行为不变。
      */
     val isExpandedLayout: Boolean
         get() = when {
             isAndroidTV -> isLandscape
             isAndroidAuto -> isLandscape
-            isMobilePlatform -> min(maxWidth, maxHeight) >= 600.dp && isLandscape
+            isMobilePlatform -> min(maxWidth, maxHeight) >= TABLET_EXPANDED_MIN_WIDTH
             else -> true
         }
 
@@ -127,6 +133,7 @@ internal fun PlatformDescriptor.usesTouchOfflineDownloadUi(): Boolean {
     return isMobilePlatform() || isAndroidAutomotivePlatform()
 }
 
+private val TABLET_EXPANDED_MIN_WIDTH = 600.dp
 private val COMPACT_SHELL_MIN_WIDTH = 900.dp
 private val WIDE_LAYOUT_MIN_WIDTH = 980.dp
 private val NARROW_ACTIONS_MAX_WIDTH = 760.dp
