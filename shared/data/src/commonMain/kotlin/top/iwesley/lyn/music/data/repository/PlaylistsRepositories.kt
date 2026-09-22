@@ -449,6 +449,20 @@ class RoomPlaylistRepository(
         }
     }
 
+    override suspend fun reorderPlaylists(orderedPlaylistIds: List<String>): Result<Unit> {
+        return runCatching {
+            orderedPlaylistIds.forEachIndexed { index, playlistId ->
+                database.playlistDao().updateCustomOrder(playlistId, index)
+            }
+        }
+    }
+
+    override suspend fun clearPlaylistCustomOrder(): Result<Unit> {
+        return runCatching {
+            database.playlistDao().clearCustomOrder()
+        }
+    }
+
     override suspend fun refreshNavidromePlaylists(): Result<Unit> {
         return runCatching {
             val remoteSources = database.importSourceDao().getAll()
@@ -996,6 +1010,7 @@ private fun PlaylistEntity.toSummary(
         memberTrackIds = memberTrackIds,
         artworkLocator = artworkLocator,
         artworkCacheKey = artworkCacheKey,
+        customOrder = customOrder,
     )
 }
 
