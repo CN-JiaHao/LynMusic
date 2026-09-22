@@ -1,2448 +1,1139 @@
-package top.iwesley.lyn.music
+package top.iwesley.lyn.music.data.repository
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.automirrored.rounded.List
-import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.Delete
-import androidx.compose.material.icons.rounded.DragHandle
-import androidx.compose.material.icons.rounded.Edit
-import androidx.compose.material.icons.rounded.Favorite
-import androidx.compose.material.icons.rounded.MoreVert
-import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.Sync
-import androidx.compose.material.icons.rounded.Tune
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.RadioButtonDefaults
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.zIndex
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.PointerEventType
-import androidx.compose.ui.input.pointer.isSecondaryPressed
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+import top.iwesley.lyn.music.core.model.DiagnosticLogger
 import top.iwesley.lyn.music.core.model.ImportSourceType
-import top.iwesley.lyn.music.core.model.NavidromeAudioQuality
-import top.iwesley.lyn.music.core.model.OfflineDownload
-import top.iwesley.lyn.music.core.model.PlaylistAddTarget
+import top.iwesley.lyn.music.core.model.LyricsHttpClient
+import top.iwesley.lyn.music.core.model.NoopDiagnosticLogger
 import top.iwesley.lyn.music.core.model.PlaylistDetail
 import top.iwesley.lyn.music.core.model.PlaylistKind
 import top.iwesley.lyn.music.core.model.PlaylistSummary
-import top.iwesley.lyn.music.core.model.SYSTEM_LIKED_PLAYLIST_ID
+import top.iwesley.lyn.music.core.model.PlaylistTrackEntry
+import top.iwesley.lyn.music.core.model.SecureCredentialStore
+import top.iwesley.lyn.music.core.model.SubsonicAuthMode
 import top.iwesley.lyn.music.core.model.Track
+import top.iwesley.lyn.music.core.model.error
+import top.iwesley.lyn.music.core.model.parseEmbySongLocator
+import top.iwesley.lyn.music.core.model.parseSubsonicCompatibleSongLocator
 import top.iwesley.lyn.music.core.model.trackArtworkCacheKey
-import top.iwesley.lyn.music.data.repository.PlaylistImportReport
-import top.iwesley.lyn.music.feature.importing.ImportState
-import top.iwesley.lyn.music.feature.library.LibrarySourceFilter
-import top.iwesley.lyn.music.feature.library.matchesLibrarySourceFilter
-import top.iwesley.lyn.music.feature.offline.OfflineDownloadIntent
-import top.iwesley.lyn.music.feature.offline.batchDownloadInsufficientSpaceMessage
-import top.iwesley.lyn.music.feature.offline.batchDownloadSizeEstimateLabel
-import top.iwesley.lyn.music.feature.offline.estimateBatchDownloadSize
-import top.iwesley.lyn.music.feature.online.OnlinePlaylistsIntent
-import top.iwesley.lyn.music.feature.online.OnlinePlaylistsState
-import top.iwesley.lyn.music.feature.player.PlayerIntent
-import top.iwesley.lyn.music.feature.playlists.PlaylistsIntent
-import top.iwesley.lyn.music.feature.playlists.PlaylistsState
-import top.iwesley.lyn.music.platform.PlatformBackHandler
-import top.iwesley.lyn.music.ui.mainShellColors
+import top.iwesley.lyn.music.data.db.ImportSourceEntity
+import top.iwesley.lyn.music.data.db.LynMusicDatabase
+import top.iwesley.lyn.music.data.db.PlaylistEntity
+import top.iwesley.lyn.music.data.db.PlaylistPreferenceEntity
+import top.iwesley.lyn.music.data.db.PlaylistRemoteBindingEntity
+import top.iwesley.lyn.music.data.db.PlaylistTrackEntity
+import top.iwesley.lyn.music.data.db.TrackEntity
+import top.iwesley.lyn.music.domain.addEmbyPlaylistItem
+import top.iwesley.lyn.music.domain.createEmbyPlaylist
+import top.iwesley.lyn.music.domain.deleteEmbyPlaylist
+import top.iwesley.lyn.music.domain.fetchEmbyPlaylistEntries
+import top.iwesley.lyn.music.domain.fetchEmbyPlaylists
+import top.iwesley.lyn.music.domain.NavidromeResolvedSource
+import top.iwesley.lyn.music.domain.isSubsonicCompatibleSourceType
+import top.iwesley.lyn.music.domain.normalizeSubsonicBaseUrl
+import top.iwesley.lyn.music.domain.removeEmbyPlaylistEntries
+import top.iwesley.lyn.music.domain.requestNavidromeJson
+import top.iwesley.lyn.music.domain.RemoteSourceAddressSelector
+import top.iwesley.lyn.music.domain.resolveEmbySource
+import top.iwesley.lyn.music.domain.toSubsonicAuthMode
+import top.iwesley.lyn.music.domain.updateEmbyPlaylistName
 
-/**
- * 定制改动：歌单列表排序方式。
- *
- * 原实现里歌单列表直接使用服务端返回的顺序，没有任何排序入口，
- * 只有「添加到歌单」弹窗内部按更新时间排了一次。
- * 这里给歌单列表补一个排序切换，纯本地显示层排序，不写回服务端。
- */
-internal enum class PlaylistSortMode(val label: String) {
-    CUSTOM("自定义（可拖动）"),
-    SERVER("服务端顺序"),
-    UPDATED("最近更新"),
-    NAME("名称"),
-    TRACK_COUNT("歌曲数"),
-}
+private const val PLAYLIST_SORT_MODE_KEY = "playlist_sort_mode"
 
-internal fun sortPlaylistSummaries(
-    playlists: List<PlaylistSummary>,
-    mode: PlaylistSortMode,
-): List<PlaylistSummary> = when (mode) {
-    PlaylistSortMode.CUSTOM -> playlists.sortedWith(
-        compareBy<PlaylistSummary> { it.customOrder ?: Int.MAX_VALUE }
-            .thenByDescending { it.updatedAt }
-    )
-
-    PlaylistSortMode.SERVER -> playlists
-    PlaylistSortMode.UPDATED -> playlists.sortedWith(
-        compareByDescending<PlaylistSummary> { it.updatedAt }.thenBy { it.name.lowercase() }
-    )
-
-    PlaylistSortMode.NAME -> playlists.sortedWith(
-        compareBy<PlaylistSummary> { it.name.lowercase() }
-    )
-
-    PlaylistSortMode.TRACK_COUNT -> playlists.sortedWith(
-        compareByDescending<PlaylistSummary> { it.trackCount }.thenBy { it.name.lowercase() }
-    )
-}
-
-fun buildPlaylistAddTargets(
-    playlists: List<PlaylistSummary>,
-    favoriteTrackIds: Set<String>,
-    trackId: String?,
-    includeLiked: Boolean = true,
-): List<PlaylistAddTarget> {
-    val likedTarget = PlaylistAddTarget(
-        id = SYSTEM_LIKED_PLAYLIST_ID,
-        name = "喜欢",
-        kind = PlaylistKind.SYSTEM_LIKED,
-        updatedAt = Long.MAX_VALUE,
-        alreadyContainsTrack = trackId != null && trackId in favoriteTrackIds,
-    )
-    val systemTargets = if (includeLiked) listOf(likedTarget) else emptyList()
-    return systemTargets + playlists
-        .sortedWith(compareByDescending<PlaylistSummary> { it.updatedAt }.thenBy { it.name.lowercase() })
-        .map { playlist ->
-            PlaylistAddTarget(
-                id = playlist.id,
-                name = playlist.name,
-                kind = playlist.kind,
-                updatedAt = playlist.updatedAt,
-                alreadyContainsTrack = trackId != null && trackId in playlist.memberTrackIds,
-            )
+class RoomPlaylistRepository(
+    private val database: LynMusicDatabase,
+    private val secureCredentialStore: SecureCredentialStore,
+    private val httpClient: LyricsHttpClient,
+    private val logger: DiagnosticLogger = NoopDiagnosticLogger,
+    private val addressSelector: RemoteSourceAddressSelector = RemoteSourceAddressSelector(),
+) : PlaylistRepository {
+    override val playlists: Flow<List<PlaylistSummary>> = combine(
+        database.playlistDao().observeAll(),
+        database.playlistTrackDao().observeAll(),
+        database.trackDao().observeAll(),
+        database.importSourceDao().observeAll(),
+        combine(
+            database.lyricsCacheDao().observeArtworkLocators(),
+            database.playlistRemoteBindingDao().observeAll(),
+        ) { artworkRows, remoteBindings -> artworkRows to remoteBindings },
+    ) { playlists, playlistTracks, trackEntities, sources, artworkAndBindings ->
+        val (artworkRows, remoteBindings) = artworkAndBindings
+        val enabledSourceIds = sources.asSequence()
+            .filter { it.isLocalIndexedEnabled() }
+            .map { it.id }
+            .toSet()
+        val artworkOverrides = effectiveArtworkOverridesByTrackId(artworkRows)
+        val trackById = trackEntities.associate { entity ->
+            entity.id to entity.toDomain(artworkOverrides[entity.id])
         }
-}
-
-@Composable
-internal fun PlaylistAddDialog(
-    track: Track,
-    isLoadingTargets: Boolean,
-    targets: List<PlaylistAddTarget>,
-    compact: Boolean = false,
-    onDismiss: () -> Unit,
-    onAddTarget: (PlaylistAddTarget) -> Unit,
-    onCreatePlaylistAndAdd: (String) -> Unit,
-) {
-    if (compact) {
-        PlaylistAddBottomSheet(
-            track = track,
-            isLoadingTargets = isLoadingTargets,
-            targets = targets,
-            onDismiss = onDismiss,
-            onAddTarget = onAddTarget,
-            onCreatePlaylistAndAdd = onCreatePlaylistAndAdd,
-        )
-    } else {
-        var selectedTargetId by remember(track.id, targets) {
-            mutableStateOf(targets.firstOrNull { !it.alreadyContainsTrack }?.id)
-        }
-        val selectedTarget = targets
-            .takeUnless { isLoadingTargets }
-            ?.firstOrNull { it.id == selectedTargetId && !it.alreadyContainsTrack }
-
-        PlaylistAddAlertDialog(
-            track = track,
-            isLoadingTargets = isLoadingTargets,
-            targets = targets,
-            selectedTargetId = selectedTargetId,
-            selectedTarget = selectedTarget,
-            onSelectTarget = { selectedTargetId = it },
-            onDismiss = onDismiss,
-            onAddTarget = onAddTarget,
-            onCreatePlaylistAndAdd = onCreatePlaylistAndAdd,
-        )
-    }
-}
-
-@Composable
-private fun PlaylistAddAlertDialog(
-    track: Track,
-    isLoadingTargets: Boolean,
-    targets: List<PlaylistAddTarget>,
-    selectedTargetId: String?,
-    selectedTarget: PlaylistAddTarget?,
-    onSelectTarget: (String) -> Unit,
-    onDismiss: () -> Unit,
-    onAddTarget: (PlaylistAddTarget) -> Unit,
-    onCreatePlaylistAndAdd: (String) -> Unit,
-) {
-    val shellColors = mainShellColors
-    var newPlaylistName by rememberSaveable(track.id) { mutableStateOf("") }
-    val fieldColors = OutlinedTextFieldDefaults.colors(
-        focusedBorderColor = mainShellColors.cardBorder,
-        unfocusedBorderColor = mainShellColors.cardBorder,
-        disabledBorderColor = mainShellColors.cardBorder,
-    )
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = shellColors.navContainer,
-        iconContentColor = MaterialTheme.colorScheme.primary,
-        titleContentColor = MaterialTheme.colorScheme.onSurface,
-        textContentColor = MaterialTheme.colorScheme.onSurface,
-        tonalElevation = 0.dp,
-        shape = RoundedCornerShape(28.dp),
-        title = { Text("加入歌单") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                Text(
-                    text = buildString {
-                        append(track.title)
-                        track.artistName?.takeIf { it.isNotBlank() }?.let {
-                            append(" · ")
-                            append(it)
-                        }
-                    },
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    if (isLoadingTargets) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(shellColors.cardContainer.copy(alpha = 0.55f))
-                                .padding(horizontal = 14.dp, vertical = 12.dp),
-                        ) {
-                            Text(
-                                text = "正在加载歌单目标…",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    } else {
-                        targets.forEach { target ->
-                            val disabled = target.alreadyContainsTrack
-                            val selected = selectedTargetId == target.id
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(16.dp))
-                                    .background(
-                                        when {
-                                            disabled -> shellColors.cardContainer.copy(alpha = 0.45f)
-                                            selected -> shellColors.selectedContainer
-                                            else -> shellColors.cardContainer.copy(alpha = 0.55f)
-                                        },
-                                    )
-                                    .clickable(enabled = !disabled) {
-                                        onSelectTarget(target.id)
-                                    }
-                                    .padding(horizontal = 10.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Box(
-                                    modifier = Modifier.width(32.dp),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    RadioButton(
-                                        selected = selected,
-                                        onClick = if (disabled) null else { { onSelectTarget(target.id) } },
-                                        modifier = Modifier.size(20.dp),
-                                        colors = RadioButtonDefaults.colors(
-                                            selectedColor = MaterialTheme.colorScheme.primary,
-                                            unselectedColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            disabledSelectedColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
-                                            disabledUnselectedColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                                        ),
-                                    )
-                                }
-                                Spacer(Modifier.width(12.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = target.name,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = if (disabled) {
-                                            MaterialTheme.colorScheme.onSurfaceVariant
-                                        } else {
-                                            MaterialTheme.colorScheme.onSurface
-                                        },
-                                    )
-                                    Text(
-                                        text = if (disabled) "已存在" else when (target.kind) {
-                                            PlaylistKind.SYSTEM_LIKED -> "加入喜欢"
-                                            PlaylistKind.USER -> "加入普通歌单"
-                                        },
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                }
-                            }
-                        }
-                    }
+        playlists.map { playlist ->
+            val visiblePlaylistTracks = playlistTracks.asSequence()
+                .filter {
+                    it.playlistId == playlist.id &&
+                        it.sourceId in enabledSourceIds &&
+                        trackById.containsKey(it.trackId)
                 }
-                ImeAwareOutlinedTextField(
-                    value = newPlaylistName,
-                    onValueChange = { newPlaylistName = it },
-                    label = { Text("新建歌单") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(18.dp),
-                    colors = fieldColors,
-                )
-                Button(
-                    onClick = {
-                        onCreatePlaylistAndAdd(newPlaylistName)
-                        newPlaylistName = ""
-                    },
-                    enabled = newPlaylistName.trim().isNotBlank(),
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.secondary,
-                        contentColor = MaterialTheme.colorScheme.onSecondary,
-                        disabledContainerColor = shellColors.cardContainer,
-                        disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    ),
-                ) {
-                    Icon(Icons.Rounded.Add, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("新建并加入")
-                }
+                .toList()
+            val memberTrackIds = visiblePlaylistTracks.asSequence()
+                .map { it.trackId }
+                .toCollection(linkedSetOf())
+            val artwork = visiblePlaylistTracks.latestPlaylistArtwork(trackById)
+            if (!playlist.isVisibleInLocalPlaylistBrowser(visiblePlaylistTracks, remoteBindings, enabledSourceIds)) {
+                return@map null
             }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = { selectedTarget?.let(onAddTarget) },
-                enabled = selectedTarget != null,
-            ) {
-                Text(
-                    text = "加入",
-                    color = if (selectedTarget != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("取消", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        },
-    )
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun PlaylistAddBottomSheet(
-    track: Track,
-    isLoadingTargets: Boolean,
-    targets: List<PlaylistAddTarget>,
-    onDismiss: () -> Unit,
-    onAddTarget: (PlaylistAddTarget) -> Unit,
-    onCreatePlaylistAndAdd: (String) -> Unit,
-) {
-    val shellColors = mainShellColors
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val appDensity = LocalDensity.current
-    var createPlaylistDialogVisible by rememberSaveable(track.id) { mutableStateOf(false) }
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = shellColors.navContainer,
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        tonalElevation = 0.dp,
-        shape = RoundedCornerShape(topStart = 34.dp, topEnd = 34.dp),
-        dragHandle = {
-            CompositionLocalProvider(LocalDensity provides appDensity) {
-                Box(
-                    modifier = Modifier
-                        .padding(top = 12.dp, bottom = 8.dp)
-                        .size(width = 50.dp, height = 5.dp)
-                        .clip(RoundedCornerShape(999.dp))
-                        .background(shellColors.cardBorder.copy(alpha = 0.75f)),
-                )
-            }
-        },
-    ) {
-        CompositionLocalProvider(LocalDensity provides appDensity) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .imePadding()
-                    .navigationBarsPadding()
-                    .padding(horizontal = 22.dp)
-                    .padding(bottom = 18.dp),
-            ) {
-                Text(
-                    text = "收藏到歌单",
-                    style = MaterialTheme.typography.titleLarge.copy(
-                        fontSize = 20.sp,
-                        lineHeight = 26.sp,
-                    ),
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = playlistAddTrackLabel(track),
-                    modifier = Modifier.padding(top = 6.dp, bottom = 14.dp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(1.dp)
-                        .background(shellColors.cardBorder.copy(alpha = 0.72f)),
-                )
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 460.dp),
-                    contentPadding = PaddingValues(top = 4.dp, bottom = 4.dp),
-                    verticalArrangement = Arrangement.spacedBy(1.dp),
-                ) {
-                    item(key = "create-playlist") {
-                        PlaylistAddCreatePlaylistRow(
-                            onClick = { createPlaylistDialogVisible = true },
-                        )
-                    }
-                    if (isLoadingTargets) {
-                        item(key = "loading") {
-                            PlaylistAddLoadingRow()
-                        }
-                    } else if (targets.isEmpty()) {
-                        item(key = "empty") {
-                            PlaylistAddEmptyRow()
-                        }
-                    } else {
-                        items(targets, key = { it.id }) { target ->
-                            PlaylistAddCompactTargetRow(
-                                target = target,
-                                onClick = { onAddTarget(target) },
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    if (createPlaylistDialogVisible) {
-        PlaylistNameDialog(
-            onDismiss = { createPlaylistDialogVisible = false },
-            onConfirm = { name ->
-                createPlaylistDialogVisible = false
-                onCreatePlaylistAndAdd(name)
-            },
-            confirmText = "新建并加入",
-        )
-    }
-}
-
-@Composable
-private fun PlaylistAddCreatePlaylistRow(
-    onClick: () -> Unit,
-) {
-    val shellColors = mainShellColors
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .clickable(onClick = onClick)
-            .padding(vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(18.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            modifier = Modifier
-                .size(52.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .background(shellColors.cardContainer.copy(alpha = 0.82f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.Add,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(28.dp),
+            playlist.toSummary(
+                memberTrackIds = memberTrackIds,
+                artworkLocator = artwork?.locator,
+                artworkCacheKey = artwork?.cacheKey,
             )
-        }
-        Text(
-            text = "新建歌单",
-            style = MaterialTheme.typography.titleMedium.copy(
-                fontSize = 18.sp,
-                lineHeight = 24.sp,
-            ),
-            fontWeight = FontWeight.Bold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        }.filterNotNull()
     }
-}
 
-@Composable
-private fun PlaylistAddLoadingRow() {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .background(mainShellColors.cardContainer.copy(alpha = 0.55f))
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-        Text(
-            text = "正在加载歌单目标…",
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-@Composable
-private fun PlaylistAddEmptyRow() {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .background(mainShellColors.cardContainer.copy(alpha = 0.55f))
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-    ) {
-        Text(
-            text = "暂无可加入的歌单",
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-@Composable
-private fun PlaylistAddCompactTargetRow(
-    target: PlaylistAddTarget,
-    onClick: () -> Unit,
-) {
-    val shellColors = mainShellColors
-    val disabled = target.alreadyContainsTrack
-    val interactionSource = remember { MutableInteractionSource() }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .clickable(
-                enabled = !disabled,
-                interactionSource = interactionSource,
-                indication = null,
-                onClick = onClick,
-            )
-            .padding(vertical = 1.dp),
-        horizontalArrangement = Arrangement.spacedBy(18.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            modifier = Modifier
-                .size(52.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .background(
-                    when {
-                        disabled -> shellColors.cardContainer.copy(alpha = 0.45f)
-                        else -> shellColors.cardContainer.copy(alpha = 0.82f)
-                    },
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = when (target.kind) {
-                    PlaylistKind.SYSTEM_LIKED -> Icons.Rounded.Favorite
-                    PlaylistKind.USER -> Icons.AutoMirrored.Rounded.List
-                },
-                contentDescription = null,
-                tint = when {
-                    disabled -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.42f)
-                    target.kind == PlaylistKind.SYSTEM_LIKED -> MaterialTheme.colorScheme.primary
-                    else -> MaterialTheme.colorScheme.onSurfaceVariant
-                },
-                modifier = Modifier.size(26.dp),
-            )
-        }
-        Text(
-            text = target.name,
-            modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.titleMedium.copy(
-                fontSize = 18.sp,
-                lineHeight = 24.sp,
-            ),
-            fontWeight = FontWeight.Bold,
-            color = if (disabled) {
-                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.62f)
-            } else {
-                MaterialTheme.colorScheme.onSurface
-            },
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        if (disabled) {
-            Text(
-                text = "已添加",
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    fontSize = 14.sp,
-                    lineHeight = 18.sp,
-                ),
+    override fun observePlaylistDetail(playlistId: String): Flow<PlaylistDetail?> {
+        return combine(
+            database.playlistDao().observeAll(),
+            database.playlistTrackDao().observeAll(),
+            database.trackDao().observeAll(),
+            database.importSourceDao().observeAll(),
+            combine(
+                database.lyricsCacheDao().observeArtworkLocators(),
+                database.playlistRemoteBindingDao().observeAll(),
+            ) { artworkRows, remoteBindings -> artworkRows to remoteBindings },
+        ) { playlists, playlistTracks, trackEntities, sources, artworkAndBindings ->
+            val (artworkRows, remoteBindings) = artworkAndBindings
+            val playlist = playlists.firstOrNull { it.id == playlistId } ?: return@combine null
+            val artworkOverrides = effectiveArtworkOverridesByTrackId(artworkRows)
+            val enabledSourceIds = sources.asSequence()
+                .filter { it.isLocalIndexedEnabled() }
+                .map { it.id }
+                .toSet()
+            val visiblePlaylistTracks = playlistTracks.filter { it.sourceId in enabledSourceIds }
+            if (!playlist.isVisibleInLocalPlaylistBrowser(visiblePlaylistTracks, remoteBindings, enabledSourceIds)) {
+                return@combine null
+            }
+            val trackById = trackEntities.associate { entity ->
+                entity.id to entity.toDomain(artworkOverrides[entity.id])
+            }
+            val sourceLabelById = sources.associate { it.id to it.label }
+            playlist.toDetail(
+                tracks = visiblePlaylistTracks,
+                trackById = trackById,
+                sourceLabelById = sourceLabelById,
             )
         }
     }
-}
 
-private fun playlistAddTrackLabel(track: Track): String {
-    return buildString {
-        append(track.title)
-        track.artistName?.takeIf { it.isNotBlank() }?.let {
-            append(" · ")
-            append(it)
+    override suspend fun createPlaylist(name: String): Result<PlaylistSummary> {
+        return runCatching {
+            val displayName = name.trim()
+            require(displayName.isNotBlank()) { "歌单名称不能为空。" }
+            val normalizedName = normalizePlaylistName(displayName)
+            require(database.playlistDao().getByNormalizedName(normalizedName) == null) { "歌单已存在。" }
+            val entity = PlaylistEntity(
+                id = newId("playlist"),
+                name = displayName,
+                normalizedName = normalizedName,
+                createdLocally = true,
+                createdAt = now(),
+                updatedAt = now(),
+            )
+            database.playlistDao().upsert(entity)
+            entity.toSummary()
         }
     }
-}
 
-@Composable
-internal fun PlaylistsTab(
-    state: PlaylistsState,
-    importState: ImportState,
-    onlineState: OnlinePlaylistsState,
-    onPlaylistsIntent: (PlaylistsIntent) -> Unit,
-    onOnlineIntent: (OnlinePlaylistsIntent) -> Unit,
-    onPlayerIntent: (PlayerIntent) -> Unit,
-    playlistSearchQuery: String = "",
-    showRefreshActionButton: Boolean = true,
-    showSourceFilterActionButton: Boolean = true,
-    batchSelectionRequestKey: Int = 0,
-    showInlineBatchOperationButton: Boolean = true,
-    modifier: Modifier = Modifier,
-) {
-    var showCreateDialog by remember { mutableStateOf(false) }
-    var showImportDialog by rememberSaveable { mutableStateOf(false) }
-    val onlineSourceOptions = remember(importState.sources) {
-        importState.onlineNavidromeSourceOptions()
-    }
-    val isOnlineMode = onlineState.sourceId != null
-    val playlists = if (isOnlineMode) onlineState.playlists else state.playlists
-    val detail = if (isOnlineMode) onlineState.selectedPlaylist else state.selectedPlaylist
-    val requestedPlaylistId = if (isOnlineMode) onlineState.selectedPlaylistId else state.selectedPlaylistId
-    val isListLoading = if (isOnlineMode) {
-        onlineState.isLoading || onlineState.isMutating
-    } else {
-        state.isLoadingContent
-    }
-    val isDetailLoading = if (isOnlineMode) {
-        onlineState.isLoadingDetail || onlineState.isMutating
-    } else {
-        state.isLoadingContent
-    }
-    val isRefreshing = if (isOnlineMode) {
-        onlineState.isLoading || onlineState.isMutating
-    } else {
-        state.isRefreshing
-    }
-    var playlistSortMode by rememberSaveable { mutableStateOf(PlaylistSortMode.SERVER) }
-    val filteredPlaylists = remember(playlists, playlistSearchQuery, playlistSortMode) {
-        sortPlaylistSummaries(
-            filterMobileLibraryHubPlaylists(playlists, playlistSearchQuery),
-            playlistSortMode,
-        )
-    }
-    val isFilteringPlaylists = playlistSearchQuery.isNotBlank() && playlists.isNotEmpty()
-    PlatformBackHandler(
-        enabled = canNavigateBackFromPlaylistDetail(requestedPlaylistId),
-        onBack = {
-            if (isOnlineMode) {
-                onOnlineIntent(OnlinePlaylistsIntent.SelectPlaylist(null))
-            } else {
-                onPlaylistsIntent(PlaylistsIntent.BackToList)
-            }
-        },
-    )
-    val filteredDetail = remember(
-        isOnlineMode,
-        detail,
-        state.selectedSourceFilter,
-        state.sourceTypesById,
-        state.offlineDownloadsByTrackId,
-    ) {
-        if (isOnlineMode) {
-            detail
-        } else {
-            detail?.let { playlistDetail ->
-                val filteredTracks = playlistDetail.tracks.filter { entry ->
-                    matchesPlaylistSourceFilter(
-                        track = entry.track,
-                        selectedSourceFilter = state.selectedSourceFilter,
-                        sourceTypesById = state.sourceTypesById,
-                        offlineDownloadsByTrackId = state.offlineDownloadsByTrackId,
+    override suspend fun renamePlaylist(playlistId: String, name: String): Result<PlaylistSummary> {
+        return runCatching {
+            val playlist = database.playlistDao().getById(playlistId) ?: error("歌单不存在。")
+            val displayName = name.trim()
+            require(displayName.isNotBlank()) { "歌单名称不能为空。" }
+            val normalizedName = normalizePlaylistName(displayName)
+            val duplicate = database.playlistDao().getByNormalizedName(normalizedName)
+            require(duplicate == null || duplicate.id == playlistId) { "歌单已存在。" }
+
+            val bindings = database.playlistRemoteBindingDao().getByPlaylistId(playlistId)
+            val writableBindings = localPlaylistMutationRemoteBindings(playlist, bindings)
+            writableBindings.forEach { binding ->
+                if (database.importSourceDao().getById(binding.sourceId)?.isEmbySource() == true) {
+                    val resolvedSource = resolveEmbySource(database, secureCredentialStore, binding.sourceId, addressSelector)
+                        ?: error("Emby 来源不可用，无法重命名歌单。")
+                    updateEmbyPlaylistName(
+                        httpClient = httpClient,
+                        source = resolvedSource,
+                        playlistId = binding.remotePlaylistId,
+                        name = displayName,
+                        logger = logger,
                     )
-                }
-                playlistDetail.copy(tracks = filteredTracks)
-            }
-        }
-    }
-    val rawDetailPresentation = remember(requestedPlaylistId, detail, playlists) {
-        buildPlaylistDetailPresentationState(
-            selectedPlaylistId = requestedPlaylistId,
-            detail = detail,
-            playlists = playlists,
-        )
-    }
-    val filteredDetailPresentation = remember(requestedPlaylistId, filteredDetail, playlists) {
-        buildPlaylistDetailPresentationState(
-            selectedPlaylistId = requestedPlaylistId,
-            detail = filteredDetail,
-            playlists = playlists,
-        )
-    }
-    val resolvedDetail = filteredDetailPresentation.resolvedDetail
-    val resolvedRawDetail = rawDetailPresentation.resolvedDetail
-    LaunchedEffect(showImportDialog, resolvedRawDetail?.id) {
-        if (showImportDialog && resolvedRawDetail == null) {
-            showImportDialog = false
-        }
-    }
-    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
-        val density = LocalDensity.current
-        val layoutProfile = buildLayoutProfile(
-            maxWidth = maxWidth,
-            maxHeight = maxHeight,
-            platform = currentPlatformDescriptor,
-            density = density,
-        )
-        val wide = layoutProfile.isExpandedLayout
-        val showPlaylistTrackDuration = !layoutProfile.isCompactLayout
-        if (showCreateDialog) {
-            PlaylistNameDialog(
-                onDismiss = { showCreateDialog = false },
-                onConfirm = { name ->
-                    showCreateDialog = false
-                    if (isOnlineMode) {
-                        onOnlineIntent(OnlinePlaylistsIntent.CreatePlaylist(name))
-                    } else {
-                        onPlaylistsIntent(PlaylistsIntent.CreatePlaylist(name))
-                    }
-                },
-            )
-        }
-        if (showImportDialog) {
-            resolvedRawDetail?.let { importTarget ->
-                PlaylistTextImportDialog(
-                    playlistName = importTarget.name,
-                    isOnlineMode = isOnlineMode,
-                    isImporting = if (isOnlineMode) onlineState.isImporting else state.isImporting,
-                    report = if (isOnlineMode) onlineState.playlistImportReport else state.playlistImportReport,
-                    onDismiss = {
-                        showImportDialog = false
-                        if (isOnlineMode) {
-                            onOnlineIntent(OnlinePlaylistsIntent.ClearPlaylistImportReport)
-                        } else {
-                            onPlaylistsIntent(PlaylistsIntent.ClearPlaylistImportReport)
-                        }
-                    },
-                    onImport = { text ->
-                        if (isOnlineMode) {
-                            onOnlineIntent(OnlinePlaylistsIntent.ImportPlaylistText(importTarget.id, text))
-                        } else {
-                            onPlaylistsIntent(PlaylistsIntent.ImportPlaylistText(importTarget.id, text))
-                        }
-                    },
-                )
-            }
-        }
-        if (wide) {
-            Row(
-                modifier = Modifier.fillMaxSize(),
-                horizontalArrangement = Arrangement.spacedBy(18.dp),
-            ) {
-                PlaylistListPane(
-                    playlists = filteredPlaylists,
-                    isLoadingContent = isListLoading,
-                    selectedPlaylistId = requestedPlaylistId,
-                    isRefreshing = isRefreshing,
-                    selectedSourceFilter = state.selectedSourceFilter,
-                    availableSourceFilters = state.availableSourceFilters,
-                    onlineSourceOptions = onlineSourceOptions,
-                    selectedOnlineSourceId = onlineState.sourceId,
-                    isOnlineMode = isOnlineMode,
-                    isFilteringByQuery = isFilteringPlaylists,
-                    showRefreshActionButton = showRefreshActionButton,
-                    showSourceFilterActionButton = showSourceFilterActionButton,
-                    playlistSortMode = playlistSortMode,
-                    onSortModeChanged = { playlistSortMode = it },
-                    onReorder = { orderedIds ->
-                        onPlaylistsIntent(PlaylistsIntent.ReorderPlaylists(orderedIds))
-                    },
-                    onRefresh = {
-                        if (isOnlineMode) {
-                            onOnlineIntent(OnlinePlaylistsIntent.Refresh)
-                        } else {
-                            onPlaylistsIntent(PlaylistsIntent.Refresh)
-                        }
-                    },
-                    onSourceFilterChanged = {
-                        onOnlineIntent(OnlinePlaylistsIntent.SelectSource(sourceId = null))
-                        onPlaylistsIntent(PlaylistsIntent.SourceFilterChanged(it))
-                    },
-                    onOnlineSourceSelected = { onOnlineIntent(OnlinePlaylistsIntent.SelectSource(it)) },
-                    onCreate = { showCreateDialog = true },
-                    onRename = { playlistId, name ->
-                        if (isOnlineMode) {
-                            onOnlineIntent(OnlinePlaylistsIntent.RenamePlaylist(playlistId, name))
-                        } else {
-                            onPlaylistsIntent(PlaylistsIntent.RenamePlaylist(playlistId, name))
-                        }
-                    },
-                    onDelete = {
-                        if (isOnlineMode) {
-                            onOnlineIntent(OnlinePlaylistsIntent.DeletePlaylist(it))
-                        } else {
-                            onPlaylistsIntent(PlaylistsIntent.DeletePlaylist(it))
-                        }
-                    },
-                    onSelect = {
-                        if (isOnlineMode) {
-                            onOnlineIntent(OnlinePlaylistsIntent.SelectPlaylist(it))
-                        } else {
-                            onPlaylistsIntent(PlaylistsIntent.SelectPlaylist(it))
-                        }
-                    },
-                    modifier = Modifier.weight(0.36f).fillMaxHeight(),
-                )
-                PlaylistDetailPane(
-                    detail = resolvedDetail,
-                    isLoadingContent = isDetailLoading,
-                    isDetailSwitchLoading = filteredDetailPresentation.isDetailSwitchLoading,
-                    requestedPlaylistName = filteredDetailPresentation.requestedPlaylistName,
-                    hasTracksOutsideFilter = !isOnlineMode &&
-                        resolvedRawDetail?.tracks?.isNotEmpty() == true &&
-                        resolvedDetail?.tracks?.isEmpty() == true,
-                    onBack = {
-                        if (isOnlineMode) {
-                            onOnlineIntent(OnlinePlaylistsIntent.SelectPlaylist(null))
-                        } else {
-                            onPlaylistsIntent(PlaylistsIntent.BackToList)
-                        }
-                    },
-                    onPlayAll = { tracks ->
-                        if (tracks.isNotEmpty()) {
-                            onPlayerIntent(PlayerIntent.PlayTracks(tracks, 0))
-                        }
-                    },
-                    onPlayTrack = { tracks, index ->
-                        onPlayerIntent(PlayerIntent.PlayTracks(tracks, index))
-                    },
-                    isImportingPlaylist = if (isOnlineMode) onlineState.isImporting else state.isImporting,
-                    onImportPlaylist = { showImportDialog = true },
-                    showImportPlaylistAction = true,
-                    onRemoveTrack = { trackId, index ->
-                        resolvedRawDetail?.id?.let { playlistId ->
-                            if (isOnlineMode) {
-                                onOnlineIntent(OnlinePlaylistsIntent.RemoveTrack(playlistId, index))
-                            } else {
-                                onPlaylistsIntent(PlaylistsIntent.RemoveTrackFromPlaylist(playlistId, trackId))
-                            }
-                        }
-                    },
-                    showTrackDuration = showPlaylistTrackDuration,
-                    allowLocalIndexActions = !isOnlineMode,
-                    modifier = Modifier.weight(0.64f).fillMaxHeight(),
-                    showBackButton = false,
-                    batchSelectionRequestKey = batchSelectionRequestKey,
-                    showInlineBatchOperationButton = showInlineBatchOperationButton,
-                )
-            }
-        } else if (!filteredDetailPresentation.shouldShowDetailPane) {
-            PlaylistListPane(
-                playlists = filteredPlaylists,
-                isLoadingContent = isListLoading,
-                selectedPlaylistId = requestedPlaylistId,
-                isRefreshing = isRefreshing,
-                selectedSourceFilter = state.selectedSourceFilter,
-                availableSourceFilters = state.availableSourceFilters,
-                onlineSourceOptions = onlineSourceOptions,
-                selectedOnlineSourceId = onlineState.sourceId,
-                isOnlineMode = isOnlineMode,
-                isFilteringByQuery = isFilteringPlaylists,
-                showRefreshActionButton = showRefreshActionButton,
-                showSourceFilterActionButton = showSourceFilterActionButton,
-                playlistSortMode = playlistSortMode,
-                onSortModeChanged = { playlistSortMode = it },
-                onReorder = { orderedIds ->
-                    onPlaylistsIntent(PlaylistsIntent.ReorderPlaylists(orderedIds))
-                },
-                onRefresh = {
-                    if (isOnlineMode) {
-                        onOnlineIntent(OnlinePlaylistsIntent.Refresh)
-                    } else {
-                        onPlaylistsIntent(PlaylistsIntent.Refresh)
-                    }
-                },
-                onSourceFilterChanged = {
-                    onOnlineIntent(OnlinePlaylistsIntent.SelectSource(sourceId = null))
-                    onPlaylistsIntent(PlaylistsIntent.SourceFilterChanged(it))
-                },
-                onOnlineSourceSelected = { onOnlineIntent(OnlinePlaylistsIntent.SelectSource(it)) },
-                onCreate = { showCreateDialog = true },
-                onRename = { playlistId, name ->
-                    if (isOnlineMode) {
-                        onOnlineIntent(OnlinePlaylistsIntent.RenamePlaylist(playlistId, name))
-                    } else {
-                        onPlaylistsIntent(PlaylistsIntent.RenamePlaylist(playlistId, name))
-                    }
-                },
-                onDelete = {
-                    if (isOnlineMode) {
-                        onOnlineIntent(OnlinePlaylistsIntent.DeletePlaylist(it))
-                    } else {
-                        onPlaylistsIntent(PlaylistsIntent.DeletePlaylist(it))
-                    }
-                },
-                onSelect = {
-                    if (isOnlineMode) {
-                        onOnlineIntent(OnlinePlaylistsIntent.SelectPlaylist(it))
-                    } else {
-                        onPlaylistsIntent(PlaylistsIntent.SelectPlaylist(it))
-                    }
-                },
-                modifier = Modifier.fillMaxSize(),
-            )
-        } else {
-            PlaylistDetailPane(
-                detail = resolvedDetail,
-                isLoadingContent = isDetailLoading,
-                isDetailSwitchLoading = filteredDetailPresentation.isDetailSwitchLoading,
-                requestedPlaylistName = filteredDetailPresentation.requestedPlaylistName,
-                hasTracksOutsideFilter = !isOnlineMode &&
-                    resolvedRawDetail?.tracks?.isNotEmpty() == true &&
-                    resolvedDetail?.tracks?.isEmpty() == true,
-                onBack = {
-                    if (isOnlineMode) {
-                        onOnlineIntent(OnlinePlaylistsIntent.SelectPlaylist(null))
-                    } else {
-                        onPlaylistsIntent(PlaylistsIntent.BackToList)
-                    }
-                },
-                onPlayAll = { tracks ->
-                    if (tracks.isNotEmpty()) {
-                        onPlayerIntent(PlayerIntent.PlayTracks(tracks, 0))
-                    }
-                },
-                onPlayTrack = { tracks, index ->
-                    onPlayerIntent(PlayerIntent.PlayTracks(tracks, index))
-                },
-                isImportingPlaylist = if (isOnlineMode) onlineState.isImporting else state.isImporting,
-                onImportPlaylist = { showImportDialog = true },
-                showImportPlaylistAction = true,
-                onRemoveTrack = { trackId, index ->
-                    resolvedRawDetail?.id?.let { playlistId ->
-                        if (isOnlineMode) {
-                            onOnlineIntent(OnlinePlaylistsIntent.RemoveTrack(playlistId, index))
-                        } else {
-                            onPlaylistsIntent(PlaylistsIntent.RemoveTrackFromPlaylist(playlistId, trackId))
-                        }
-                    }
-                },
-                showTrackDuration = showPlaylistTrackDuration,
-                allowLocalIndexActions = !isOnlineMode,
-                modifier = Modifier.fillMaxSize(),
-                showBackButton = true,
-                batchSelectionRequestKey = batchSelectionRequestKey,
-                showInlineBatchOperationButton = showInlineBatchOperationButton,
-            )
-        }
-    }
-}
-
-internal data class PlaylistDetailPresentationState(
-    val requestedPlaylistId: String?,
-    val requestedPlaylistName: String?,
-    val resolvedDetail: PlaylistDetail?,
-    val isDetailSwitchLoading: Boolean,
-    val shouldShowDetailPane: Boolean,
-)
-
-internal fun buildPlaylistDetailPresentationState(
-    selectedPlaylistId: String?,
-    detail: PlaylistDetail?,
-    playlists: List<PlaylistSummary>,
-): PlaylistDetailPresentationState {
-    val resolvedDetail = detail?.takeIf { it.id == selectedPlaylistId }
-    return PlaylistDetailPresentationState(
-        requestedPlaylistId = selectedPlaylistId,
-        requestedPlaylistName = playlists.firstOrNull { it.id == selectedPlaylistId }?.name,
-        resolvedDetail = resolvedDetail,
-        isDetailSwitchLoading = selectedPlaylistId != null && resolvedDetail == null,
-        shouldShowDetailPane = selectedPlaylistId != null,
-    )
-}
-
-@Composable
-@OptIn(ExperimentalLayoutApi::class)
-private fun PlaylistListPane(
-    playlists: List<PlaylistSummary>,
-    isLoadingContent: Boolean,
-    selectedPlaylistId: String?,
-    isRefreshing: Boolean,
-    selectedSourceFilter: LibrarySourceFilter,
-    availableSourceFilters: List<LibrarySourceFilter>,
-    onlineSourceOptions: List<OnlineSourceOption> = emptyList(),
-    selectedOnlineSourceId: String? = null,
-    isOnlineMode: Boolean = false,
-    isFilteringByQuery: Boolean = false,
-    showRefreshActionButton: Boolean = true,
-    showSourceFilterActionButton: Boolean = true,
-    playlistSortMode: PlaylistSortMode,
-    onSortModeChanged: (PlaylistSortMode) -> Unit,
-    onReorder: (List<String>) -> Unit,
-    onRefresh: () -> Unit,
-    onSourceFilterChanged: (LibrarySourceFilter) -> Unit,
-    onOnlineSourceSelected: (String) -> Unit = {},
-    onCreate: () -> Unit,
-    onRename: (String, String) -> Unit,
-    onDelete: (String) -> Unit,
-    onSelect: (String) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    var sourceFilterMenuExpanded by remember { mutableStateOf(false) }
-    var sortMenuExpanded by remember { mutableStateOf(false) }
-    var draggingPlaylistId by remember { mutableStateOf<String?>(null) }
-    var dragOffsetY by remember { mutableStateOf(0f) }
-    var itemHeightPx by remember { mutableStateOf(0f) }
-    val canDragPlaylists = playlistSortMode == PlaylistSortMode.CUSTOM &&
-        !isFilteringByQuery &&
-        !isOnlineMode
-    val draggingIndex = remember(playlists, draggingPlaylistId) {
-        playlists.indexOfFirst { it.id == draggingPlaylistId }
-    }
-    val dragTargetIndex = remember(draggingIndex, dragOffsetY, itemHeightPx, playlists.size) {
-        if (draggingIndex < 0 || itemHeightPx <= 0f || playlists.isEmpty()) {
-            draggingIndex
-        } else {
-            val steps = (dragOffsetY / itemHeightPx + if (dragOffsetY >= 0f) 0.5f else -0.5f).toInt()
-            (draggingIndex + steps).coerceIn(0, playlists.lastIndex)
-        }
-    }
-    val mobilePlatform = currentPlatformDescriptor.isMobilePlatform()
-    var menuPlaylistId by rememberSaveable { mutableStateOf<String?>(null) }
-    var pendingRenamePlaylistId by rememberSaveable { mutableStateOf<String?>(null) }
-    var pendingRenamePlaylistName by rememberSaveable { mutableStateOf("") }
-    var pendingDeletePlaylistId by rememberSaveable { mutableStateOf<String?>(null) }
-    var pendingDeletePlaylistName by rememberSaveable { mutableStateOf("") }
-    val pendingRenamePlaylist = remember(playlists, pendingRenamePlaylistId) {
-        playlists.firstOrNull { it.id == pendingRenamePlaylistId }
-    }
-    val pendingDeletePlaylist = remember(playlists, pendingDeletePlaylistId) {
-        playlists.firstOrNull { it.id == pendingDeletePlaylistId }
-    }
-    LaunchedEffect(pendingRenamePlaylistId, pendingRenamePlaylist) {
-        if (pendingRenamePlaylistId != null && pendingRenamePlaylist == null) {
-            pendingRenamePlaylistId = null
-            pendingRenamePlaylistName = ""
-        }
-    }
-    LaunchedEffect(pendingDeletePlaylistId, pendingDeletePlaylist) {
-        if (pendingDeletePlaylistId != null && pendingDeletePlaylist == null) {
-            pendingDeletePlaylistId = null
-            pendingDeletePlaylistName = ""
-        }
-    }
-
-    Box(modifier = modifier.fillMaxSize()) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            userScrollEnabled = draggingPlaylistId == null,
-        ) {
-            item {
-                PlaylistSectionTitle(
-                    title = "歌单",
-                    subtitle = if (isOnlineMode) {
-                        "当前显示 Navidrome 远端歌单，变更会直接同步到服务器。"
-                    } else {
-                        "普通歌单支持本地歌曲和 Subsonic-compatible 歌曲混合收藏。"
-                    },
-                )
-            }
-            item {
-                FlowRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    OutlinedButton(onClick = onCreate) {
-                        Icon(Icons.Rounded.Add, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            text = "新建歌单",
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    if (showRefreshActionButton) {
-                        OutlinedButton(onClick = onRefresh) {
-                            Icon(Icons.Rounded.Sync, contentDescription = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                text = if (isRefreshing) "同步中" else "同步远端",
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
-                    if (showSourceFilterActionButton) {
-                        val selectedOnlineSourceLabel = onlineSourceOptions
-                            .firstOrNull { it.sourceId == selectedOnlineSourceId }
-                            ?.label
-                        Box {
-                            OutlinedButton(onClick = { sourceFilterMenuExpanded = true }) {
-                                Icon(Icons.Rounded.Tune, contentDescription = null)
-                                Spacer(Modifier.width(8.dp))
-                                Text(
-                                    text = selectedOnlineSourceLabel
-                                        ?: playlistSourceFilterButtonLabel(selectedSourceFilter),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                            DropdownMenu(
-                                expanded = sourceFilterMenuExpanded,
-                                onDismissRequest = { sourceFilterMenuExpanded = false },
-                                containerColor = mainShellColors.navContainer,
-                            ) {
-                                availableSourceFilters.forEach { filter ->
-                                    DropdownMenuItem(
-                                        text = { Text(playlistSourceFilterMenuLabel(filter)) },
-                                        onClick = {
-                                            sourceFilterMenuExpanded = false
-                                            onSourceFilterChanged(filter)
-                                        },
-                                    )
-                                }
-                                onlineSourceOptions.forEach { option ->
-                                    DropdownMenuItem(
-                                        text = { Text(option.label) },
-                                        onClick = {
-                                            sourceFilterMenuExpanded = false
-                                            onOnlineSourceSelected(option.sourceId)
-                                        },
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    Box {
-                        OutlinedButton(onClick = { sortMenuExpanded = true }) {
-                            Icon(Icons.Rounded.Tune, contentDescription = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                text = "排序：" + playlistSortMode.label,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                        DropdownMenu(
-                            expanded = sortMenuExpanded,
-                            onDismissRequest = { sortMenuExpanded = false },
-                            containerColor = mainShellColors.navContainer,
-                        ) {
-                            PlaylistSortMode.values().forEach { mode ->
-                                DropdownMenuItem(
-                                    text = { Text(mode.label) },
-                                    onClick = {
-                                        sortMenuExpanded = false
-                                        onSortModeChanged(mode)
-                                    },
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-            if (isLoadingContent) {
-                item {
-                    EmptyStateCard(
-                        title = "正在加载歌单",
-                        body = "歌单数据会在页面显示后继续异步整理，请稍候。",
-                    )
-                }
-            } else if (playlists.isEmpty()) {
-                item {
-                    if (isFilteringByQuery) {
-                        EmptyStateCard(
-                            title = "没有匹配的歌单",
-                            body = "试试调整搜索词，或清空搜索后查看全部歌单。",
-                        )
-                    } else {
-                        EmptyStateCard(
-                            title = "还没有普通歌单",
-                            body = if (isOnlineMode) {
-                                "远端还没有普通歌单，可以先新建一个空歌单。"
-                            } else {
-                                "从播放器把当前歌曲加入歌单，或先新建一个空歌单。"
-                            },
-                        )
-                    }
-                }
-            } else {
-                items(playlists, key = { it.id }) { playlist ->
-                    val itemIndex = playlists.indexOfFirst { it.id == playlist.id }
-                    val itemShiftPx = when {
-                        !canDragPlaylists || draggingIndex < 0 || dragTargetIndex == draggingIndex -> 0f
-                        itemIndex == draggingIndex -> dragOffsetY
-                        dragTargetIndex < draggingIndex && itemIndex in dragTargetIndex until draggingIndex -> itemHeightPx
-                        dragTargetIndex > draggingIndex && itemIndex in (draggingIndex + 1)..dragTargetIndex -> -itemHeightPx
-                        else -> 0f
-                    }
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .onSizeChanged { size ->
-                                if (itemHeightPx <= 0f && size.height > 0) {
-                                    itemHeightPx = size.height.toFloat()
-                                }
-                            }
-                            .zIndex(if (itemIndex == draggingIndex) 1f else 0f)
-                            .offset { IntOffset(0, itemShiftPx.toInt()) },
-                    ) {
-                        PlaylistSummaryCard(
-                            playlist = playlist,
-                            selected = playlist.id == selectedPlaylistId,
-                            mobilePlatform = mobilePlatform,
-                            menuExpanded = menuPlaylistId == playlist.id,
-                            showDragHandle = canDragPlaylists,
-                            dragModifier = Modifier.pointerInput(canDragPlaylists) {
-                                if (!canDragPlaylists) return@pointerInput
-                                detectDragGesturesAfterLongPress(
-                                    onDragStart = {
-                                        draggingPlaylistId = playlist.id
-                                        dragOffsetY = 0f
-                                    },
-                                    onDragCancel = {
-                                        draggingPlaylistId = null
-                                        dragOffsetY = 0f
-                                    },
-                                    onDragEnd = {
-                                        val from = playlists.indexOfFirst { it.id == playlist.id }
-                                        val steps = if (itemHeightPx > 0f) {
-                                            (dragOffsetY / itemHeightPx + if (dragOffsetY >= 0f) 0.5f else -0.5f).toInt()
-                                        } else {
-                                            0
-                                        }
-                                        val to = if (from < 0 || playlists.isEmpty()) {
-                                            -1
-                                        } else {
-                                            (from + steps).coerceIn(0, playlists.lastIndex)
-                                        }
-                                        draggingPlaylistId = null
-                                        dragOffsetY = 0f
-                                        if (from >= 0 && to >= 0 && to != from) {
-                                            val reordered = playlists.toMutableList()
-                                            reordered.add(to, reordered.removeAt(from))
-                                            onReorder(reordered.map { it.id })
-                                        }
-                                    },
-                                    onDrag = { _, dragAmount ->
-                                        dragOffsetY += dragAmount.y
-                                    },
-                                )
-                            },
-                            onClick = {
-                                if (draggingPlaylistId == null) {
-                                    onSelect(playlist.id)
-                                }
-                            },
-                            onOpenMenu = { menuPlaylistId = playlist.id },
-                            onDismissMenu = {
-                                if (menuPlaylistId == playlist.id) {
-                                    menuPlaylistId = null
-                                }
-                            },
-                            onRequestRename = {
-                                menuPlaylistId = null
-                                pendingRenamePlaylistId = playlist.id
-                                pendingRenamePlaylistName = playlist.name
-                            },
-                            onRequestDelete = {
-                                menuPlaylistId = null
-                                pendingDeletePlaylistId = playlist.id
-                                pendingDeletePlaylistName = playlist.name
-                            },
-                        )
-                    }
-                }
-            }
-        }
-
-        pendingRenamePlaylist?.let { playlist ->
-            PlaylistNameDialog(
-                title = "重命名歌单",
-                initialName = pendingRenamePlaylistName.ifBlank { playlist.name },
-                confirmText = "保存",
-                onDismiss = {
-                    pendingRenamePlaylistId = null
-                    pendingRenamePlaylistName = ""
-                },
-                onConfirm = { name ->
-                    pendingRenamePlaylistId = null
-                    pendingRenamePlaylistName = ""
-                    onRename(playlist.id, name)
-                },
-            )
-        }
-
-        pendingDeletePlaylist?.let { playlist ->
-            PlaylistDeleteDialog(
-                playlistName = pendingDeletePlaylistName.ifBlank { playlist.name },
-                isOnlineMode = isOnlineMode,
-                onDismiss = {
-                    pendingDeletePlaylistId = null
-                    pendingDeletePlaylistName = ""
-                },
-                onConfirm = {
-                    pendingDeletePlaylistId = null
-                    pendingDeletePlaylistName = ""
-                    onDelete(playlist.id)
-                },
-            )
-        }
-    }
-}
-
-@Composable
-private fun PlaylistCardActionsMenu(
-    expanded: Boolean,
-    onDismissRequest: () -> Unit,
-    onRequestRename: () -> Unit,
-    onRequestDelete: () -> Unit,
-) {
-    DropdownMenu(
-        expanded = expanded,
-        onDismissRequest = onDismissRequest,
-        containerColor = mainShellColors.navContainer,
-    ) {
-        DropdownMenuItem(
-            text = { Text("重命名") },
-            leadingIcon = {
-                Icon(
-                    imageVector = Icons.Rounded.Edit,
-                    contentDescription = null,
-                )
-            },
-            onClick = onRequestRename,
-        )
-        DropdownMenuItem(
-            text = {
-                Text(
-                    text = "删除歌单",
-                    color = MaterialTheme.colorScheme.error,
-                )
-            },
-            leadingIcon = {
-                Icon(
-                    imageVector = Icons.Rounded.Delete,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.error,
-                )
-            },
-            onClick = onRequestDelete,
-        )
-    }
-}
-
-@Composable
-@OptIn(ExperimentalFoundationApi::class)
-private fun PlaylistSummaryCard(
-    playlist: PlaylistSummary,
-    selected: Boolean,
-    mobilePlatform: Boolean,
-    menuExpanded: Boolean,
-    showDragHandle: Boolean = false,
-    dragModifier: Modifier = Modifier,
-    onClick: () -> Unit,
-    onOpenMenu: () -> Unit,
-    onDismissMenu: () -> Unit,
-    onRequestRename: () -> Unit,
-    onRequestDelete: () -> Unit,
-) {
-    val shellColors = mainShellColors
-    val cardShape = RoundedCornerShape(24.dp)
-    val interactionModifier = if (mobilePlatform) {
-        if (showDragHandle) {
-            // 自定义排序模式下长按交给拖拽手势，菜单改由右上角“更多”按钮打开
-            Modifier.clickable(onClick = onClick)
-        } else {
-            Modifier.combinedClickable(
-                onClick = onClick,
-                onLongClick = onOpenMenu,
-            )
-        }
-    } else {
-        Modifier
-            .pointerInput(onOpenMenu) {
-                awaitPointerEventScope {
-                    while (true) {
-                        val event = awaitPointerEvent()
-                        if (event.type == PointerEventType.Press && event.buttons.isSecondaryPressed) {
-                            event.changes.forEach { it.consume() }
-                            onOpenMenu()
-                        }
-                    }
-                }
-            }
-            .clickable(onClick = onClick)
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .then(dragModifier),
-    ) {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(cardShape)
-                .then(interactionModifier),
-            shape = cardShape,
-            colors = CardDefaults.cardColors(
-                containerColor = if (selected) MaterialTheme.colorScheme.secondary else shellColors.cardContainer,
-            ),
-            border = null,
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 18.dp, vertical = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
-            ) {
-                PlaylistArtworkThumbnail(
-                    artworkLocator = playlistSummaryArtworkLocator(playlist),
-                    artworkCacheKey = playlistSummaryArtworkCacheKey(playlist),
-                    cornerRadius = 8.dp,
-                    containerColor = if (selected) Color.Transparent else shellColors.navContainer,
-                    fallbackTint = if (selected) {
-                        MaterialTheme.colorScheme.onSecondary
-                    } else {
-                        MaterialTheme.colorScheme.primary
-                    },
-                )
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        playlist.name,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        "${playlist.trackCount} 首歌曲",
-                        color = if (selected) {
-                            MaterialTheme.colorScheme.onSecondary
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                    )
-                }
-                if (showDragHandle) {
-                    Box {
-                        IconButton(onClick = onOpenMenu) {
-                            Icon(
-                                imageVector = Icons.Rounded.MoreVert,
-                                contentDescription = "更多操作",
-                                tint = if (selected) {
-                                    MaterialTheme.colorScheme.onSecondary
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                },
-                            )
-                        }
-                        PlaylistCardActionsMenu(
-                            expanded = menuExpanded,
-                            onDismissRequest = onDismissMenu,
-                            onRequestRename = onRequestRename,
-                            onRequestDelete = onRequestDelete,
-                        )
-                    }
-                    Icon(
-                        imageVector = Icons.Rounded.DragHandle,
-                        contentDescription = "长按卡片拖动调整顺序",
-                        tint = if (selected) {
-                            MaterialTheme.colorScheme.onSecondary
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                        modifier = Modifier.size(32.dp),
-                    )
-                }
-            }
-        }
-
-        if (!showDragHandle) {
-            PlaylistCardActionsMenu(
-                expanded = menuExpanded,
-                onDismissRequest = onDismissMenu,
-                onRequestRename = onRequestRename,
-                onRequestDelete = onRequestDelete,
-            )
-        }
-    }
-}
-
-internal fun playlistSummaryArtworkLocator(playlist: PlaylistSummary): String? {
-    return playlist.artworkLocator?.takeIf { it.isNotBlank() }
-}
-
-internal fun playlistSummaryArtworkCacheKey(playlist: PlaylistSummary): String? {
-    return playlist.artworkCacheKey?.takeIf { it.isNotBlank() }
-}
-
-@Composable
-private fun PlaylistDeleteDialog(
-    playlistName: String,
-    isOnlineMode: Boolean = false,
-    onDismiss: () -> Unit,
-    onConfirm: () -> Unit,
-) {
-    val shellColors = mainShellColors
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = shellColors.navContainer,
-        iconContentColor = MaterialTheme.colorScheme.error,
-        titleContentColor = MaterialTheme.colorScheme.onSurface,
-        textContentColor = MaterialTheme.colorScheme.onSurface,
-        tonalElevation = 0.dp,
-        shape = RoundedCornerShape(28.dp),
-        title = { Text("删除歌单") },
-        text = {
-            Text(
-                if (isOnlineMode) {
-                    "确认删除远端歌单“$playlistName”吗？删除后会同步到服务器。"
                 } else {
-                    "确认删除“$playlistName”吗？本地和已同步的远端歌单都会一起删除。"
-                },
+                    val resolvedSource = resolveSubsonicCompatibleSource(
+                        sourceId = binding.sourceId,
+                        requireLocalIndex = false,
+                    )
+                        ?: error("Subsonic-compatible 来源不可用，无法重命名歌单。")
+                    requestNavidromeJson(
+                        httpClient = httpClient,
+                        source = resolvedSource,
+                        endpoint = "updatePlaylist",
+                        parameters = mapOf(
+                            "playlistId" to binding.remotePlaylistId,
+                            "name" to displayName,
+                        ),
+                        logger = logger,
+                        logContext = "playlist=\"${playlist.name}\" rename remotePlaylist=${binding.remotePlaylistId}",
+                    )
+                }
+            }
+
+            val updatedAt = now()
+            val updatedPlaylist = playlist.copy(
+                name = displayName,
+                normalizedName = normalizedName,
+                updatedAt = updatedAt,
             )
-        },
-        confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text(
-                    text = "删除",
-                    color = MaterialTheme.colorScheme.error,
+            database.playlistDao().upsert(updatedPlaylist)
+            writableBindings.forEach { binding ->
+                database.playlistRemoteBindingDao().upsert(
+                    binding.copy(
+                        remoteName = displayName,
+                        lastSyncedAt = updatedAt,
+                    ),
                 )
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("取消", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        },
-    )
-}
+            updatedPlaylist.toSummary(
+                memberTrackIds = database.playlistTrackDao()
+                    .getByPlaylistId(playlistId)
+                    .mapTo(linkedSetOf()) { it.trackId },
+            )
+        }
+    }
 
-@Composable
-private fun PlaylistTextImportDialog(
-    playlistName: String,
-    isOnlineMode: Boolean = false,
-    isImporting: Boolean,
-    report: PlaylistImportReport?,
-    onDismiss: () -> Unit,
-    onImport: (String) -> Unit,
-) {
-    val shellColors = mainShellColors
-    val appDensity = LocalDensity.current
-    val uriHandler = LocalUriHandler.current
-    var text by rememberSaveable(playlistName) { mutableStateOf("") }
-    val fieldColors = OutlinedTextFieldDefaults.colors(
-        focusedBorderColor = shellColors.cardBorder,
-        unfocusedBorderColor = shellColors.cardBorder,
-        disabledBorderColor = shellColors.cardBorder,
-    )
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
-    ) {
-        CompositionLocalProvider(LocalDensity provides appDensity) {
-            BoxWithConstraints(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .imePadding()
-                    .navigationBarsPadding(),
-            ) {
-                val dialogLayout = playlistImportDialogLayout(maxWidth = maxWidth, maxHeight = maxHeight)
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(
-                            horizontal = dialogLayout.outerHorizontalPadding,
-                            vertical = dialogLayout.outerVerticalPadding,
-                        ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth(0.94f)
-                            .widthIn(max = 460.dp)
-                            .heightIn(max = dialogLayout.maxHeight),
-                        shape = RoundedCornerShape(28.dp),
-                        colors = CardDefaults.cardColors(containerColor = shellColors.navContainer),
-                        border = BorderStroke(1.dp, shellColors.cardBorder),
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(max = dialogLayout.maxHeight)
-                                .padding(
-                                    horizontal = dialogLayout.contentHorizontalPadding,
-                                    vertical = dialogLayout.contentVerticalPadding,
-                                ),
-                            verticalArrangement = Arrangement.spacedBy(dialogLayout.verticalSpacing),
-                        ) {
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text(
-                                    text = "导入歌单",
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    style = MaterialTheme.typography.headlineSmall,
-                                    fontWeight = FontWeight.Bold,
-                                )
-                                Text(
-                                    text = if (isOnlineMode) {
-                                        "导入到远端歌单“$playlistName”。每行使用“歌名 - 歌手”，会远端搜索 Navidrome 曲库并加入当前远端歌单。"
-                                    } else {
-                                        "导入到“$playlistName”。每行使用“歌名 - 歌手”，只会匹配已有曲库中的歌曲。"
-                                    },
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                )
-                            }
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .weight(1f, fill = false)
-                                    .verticalScroll(rememberScrollState()),
-                                verticalArrangement = Arrangement.spacedBy(12.dp),
-                            ) {
-                                ImeAwareOutlinedTextField(
-                                    value = text,
-                                    onValueChange = { text = it },
-                                    label = { Text("导入内容") },
-                                    placeholder = { Text("喜欢你 - BEYOND\n唯一 - 邓紫棋") },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(18.dp),
-                                    minLines = dialogLayout.textFieldLines,
-                                    maxLines = dialogLayout.textFieldLines,
-                                    colors = fieldColors,
-                                )
-                                report?.let { PlaylistImportReportContent(it) }
-                            }
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.End,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                TextButton(onClick = onDismiss) {
-                                    Text("关闭", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                                Spacer(Modifier.width(8.dp))
-                                TextButton(
-                                    onClick = { uriHandler.openUri(PlaylistImportAssistantUrl) },
-                                ) {
-                                    Text("助手", color = MaterialTheme.colorScheme.primary)
-                                }
-                                Spacer(Modifier.width(8.dp))
-                                TextButton(
-                                    onClick = { onImport(text) },
-                                    enabled = canConfirmPlaylistImport(text, isImporting),
-                                ) {
-                                    Text(
-                                        text = if (isImporting) "导入中" else "导入",
-                                        color = if (canConfirmPlaylistImport(text, isImporting)) {
-                                            MaterialTheme.colorScheme.primary
-                                        } else {
-                                            MaterialTheme.colorScheme.onSurfaceVariant
-                                        },
-                                    )
-                                }
-                            }
-                        }
-                    }
+    override suspend fun deletePlaylist(playlistId: String): Result<Unit> {
+        return runCatching {
+            val playlist = database.playlistDao().getById(playlistId) ?: error("歌单不存在。")
+            val bindings = localPlaylistMutationRemoteBindings(
+                playlist = playlist,
+                bindings = database.playlistRemoteBindingDao().getByPlaylistId(playlistId),
+            )
+            bindings.forEach { binding ->
+                if (database.importSourceDao().getById(binding.sourceId)?.isEmbySource() == true) {
+                    val resolvedSource = resolveEmbySource(database, secureCredentialStore, binding.sourceId, addressSelector)
+                        ?: error("Emby 来源不可用，无法删除歌单。")
+                    deleteEmbyPlaylist(
+                        httpClient = httpClient,
+                        source = resolvedSource,
+                        playlistId = binding.remotePlaylistId,
+                        logger = logger,
+                    )
+                } else {
+                    val resolvedSource = resolveSubsonicCompatibleSource(
+                        sourceId = binding.sourceId,
+                        requireLocalIndex = false,
+                    )
+                        ?: error("Subsonic-compatible 来源不可用，无法删除歌单。")
+                    requestNavidromeJson(
+                        httpClient = httpClient,
+                        source = resolvedSource,
+                        endpoint = "deletePlaylist",
+                        parameters = mapOf("id" to binding.remotePlaylistId),
+                        logger = logger,
+                        logContext = "playlist=\"${playlist.name}\" delete remotePlaylist=${binding.remotePlaylistId}",
+                    )
+                }
+            }
+            deleteLocalPlaylist(playlistId)
+        }
+    }
+
+    override suspend fun addTrackToPlaylist(playlistId: String, track: Track): Result<Unit> {
+        return runCatching {
+            val playlist = database.playlistDao().getById(playlistId) ?: error("歌单不存在。")
+            if (database.playlistTrackDao().getByPlaylistIdAndTrackId(playlistId, track.id) != null) {
+                error("歌曲已在歌单中。")
+            }
+            val subsonicSong = parseSubsonicCompatibleSongLocator(track.mediaLocator)
+                ?.takeIf { it.sourceId == track.sourceId }
+            if (subsonicSong != null) {
+                addSubsonicCompatibleTrackToPlaylist(playlist, track, subsonicSong.itemId)
+            } else {
+                val embySong = parseEmbySongLocator(track.mediaLocator)
+                    ?.takeIf { it.first == track.sourceId }
+                if (embySong != null) {
+                    addEmbyTrackToPlaylist(playlist, track, embySong.second)
+                } else {
+                    addLocalTrackToPlaylist(playlist, track)
                 }
             }
         }
     }
-}
 
-@Composable
-private fun PlaylistImportReportContent(report: PlaylistImportReport) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .background(mainShellColors.cardContainer.copy(alpha = 0.65f))
-            .padding(14.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text(
-            text = playlistImportReportSummary(report),
-            fontWeight = FontWeight.SemiBold,
-        )
-        if (report.hasIssues) {
-            PlaylistImportIssueGroup("格式错误", report.malformedLines.map(::formatPlaylistImportLineIssue))
-            PlaylistImportIssueGroup("未匹配", report.notMatchedLines.map(::formatPlaylistImportLineIssue))
-            PlaylistImportIssueGroup(
-                title = "多个匹配",
-                lines = report.ambiguousLines.map { issue ->
-                    "第 ${issue.lineNumber} 行：${issue.rawText}（${issue.matchCount} 个匹配）"
-                },
-            )
-            PlaylistImportIssueGroup(
-                title = "加入失败",
-                lines = report.failedLines.map { issue ->
-                    "第 ${issue.lineNumber} 行：${issue.rawText}（${issue.message}）"
-                },
-            )
-            if (report.duplicateInputCount > 0) {
-                Text(
-                    text = "输入内重复：${report.duplicateInputCount} 首",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodySmall,
+    override suspend fun importPlaylistText(
+        playlistId: String,
+        text: String,
+    ): Result<PlaylistImportReport> {
+        return runCatching {
+            database.playlistDao().getById(playlistId) ?: error("歌单不存在。")
+            val enabledSourceIds = database.importSourceDao().getAll()
+                .filter { it.isLocalIndexedEnabled() }
+                .mapTo(linkedSetOf()) { it.id }
+            val malformedLines = mutableListOf<PlaylistImportLineIssue>()
+            val parsedLines = mutableListOf<PlaylistTextImportLine>()
+            val requestedKeys = linkedSetOf<PlaylistTextImportKey>()
+
+            text.lineSequence().forEachIndexed { index, rawLine ->
+                if (rawLine.isBlank()) return@forEachIndexed
+                val lineNumber = index + 1
+                val parsedLine = parsePlaylistTextImportLine(lineNumber, rawLine)
+                if (parsedLine == null) {
+                    malformedLines += PlaylistImportLineIssue(
+                        lineNumber = lineNumber,
+                        rawText = rawLine,
+                    )
+                } else {
+                    parsedLines += parsedLine
+                    requestedKeys += parsedLine.key
+                }
+            }
+
+            val tracksByImportKey = if (enabledSourceIds.isEmpty() || requestedKeys.isEmpty()) {
+                emptyMap()
+            } else {
+                getPlaylistTextImportCandidateTracks(
+                    enabledSourceIds = enabledSourceIds.toList(),
+                    requestedKeys = requestedKeys.toList(),
                 )
+                    .map { it.toDomain() }
+                    .groupBy { track ->
+                        PlaylistTextImportKey(
+                            title = normalizePlaylistTextImportPart(track.title),
+                            artist = normalizePlaylistTextImportPart(track.artistName.orEmpty()),
+                        )
+                    }
+            }
+            val currentMemberTrackIds = database.playlistTrackDao()
+                .getByPlaylistId(playlistId)
+                .mapTo(linkedSetOf()) { it.trackId }
+            val seenInputTrackIds = linkedSetOf<String>()
+            var addedCount = 0
+            var alreadyExistsCount = 0
+            var duplicateInputCount = 0
+            val notMatchedLines = mutableListOf<PlaylistImportLineIssue>()
+            val ambiguousLines = mutableListOf<PlaylistImportAmbiguousLineIssue>()
+            val failedLines = mutableListOf<PlaylistImportFailedLineIssue>()
+
+            parsedLines.forEach { parsedLine ->
+                val lineNumber = parsedLine.lineNumber
+                val rawLine = parsedLine.rawText
+                val matches = tracksByImportKey[parsedLine.key].orEmpty()
+                when {
+                    matches.isEmpty() -> {
+                        notMatchedLines += PlaylistImportLineIssue(
+                            lineNumber = lineNumber,
+                            rawText = rawLine,
+                        )
+                    }
+
+                    matches.size > 1 -> {
+                        ambiguousLines += PlaylistImportAmbiguousLineIssue(
+                            lineNumber = lineNumber,
+                            rawText = rawLine,
+                            matchCount = matches.size,
+                        )
+                    }
+
+                    else -> {
+                        val track = matches.single()
+                        if (!seenInputTrackIds.add(track.id)) {
+                            duplicateInputCount += 1
+                            return@forEach
+                        }
+                        if (track.id in currentMemberTrackIds) {
+                            alreadyExistsCount += 1
+                            return@forEach
+                        }
+                        addTrackToPlaylist(playlistId, track)
+                            .onSuccess {
+                                currentMemberTrackIds += track.id
+                                addedCount += 1
+                            }
+                            .onFailure { throwable ->
+                                failedLines += PlaylistImportFailedLineIssue(
+                                    lineNumber = lineNumber,
+                                    rawText = rawLine,
+                                    message = throwable.message.orEmpty().ifBlank { "加入失败。" },
+                                )
+                            }
+                    }
+                }
+            }
+
+            PlaylistImportReport(
+                addedCount = addedCount,
+                alreadyExistsCount = alreadyExistsCount,
+                duplicateInputCount = duplicateInputCount,
+                malformedLines = malformedLines,
+                notMatchedLines = notMatchedLines,
+                ambiguousLines = ambiguousLines,
+                failedLines = failedLines,
+            )
+        }
+    }
+
+    private suspend fun getPlaylistTextImportCandidateTracks(
+        enabledSourceIds: List<String>,
+        requestedKeys: List<PlaylistTextImportKey>,
+    ): List<TrackEntity> {
+        if (enabledSourceIds.isEmpty() || requestedKeys.isEmpty()) return emptyList()
+        val candidatesById = linkedMapOf<String, TrackEntity>()
+        enabledSourceIds.chunked(PlaylistTextImportSourceChunkSize).forEach { sourceChunk ->
+            val keyChunkSize = maxOf(
+                1,
+                (PlaylistTextImportSqlBindLimit - sourceChunk.size) / PlaylistTextImportBindingsPerKey,
+            )
+            requestedKeys.chunked(keyChunkSize).forEach { keyChunk ->
+                database.trackDao()
+                    .getByNormalizedTitleAndArtistCandidates(
+                        sourceIds = sourceChunk,
+                        titles = keyChunk.map { it.title }.distinct(),
+                        artists = keyChunk.map { it.artist }.distinct(),
+                    )
+                    .forEach { track ->
+                        candidatesById.getOrPut(track.id) { track }
+                    }
+            }
+        }
+        return candidatesById.values.toList()
+    }
+
+    override suspend fun removeTrackFromPlaylist(playlistId: String, trackId: String): Result<Unit> {
+        return runCatching {
+            val playlist = database.playlistDao().getById(playlistId) ?: error("歌单不存在。")
+            val row = database.playlistTrackDao().getByPlaylistIdAndTrackId(playlistId, trackId) ?: return@runCatching
+            val binding = database.playlistRemoteBindingDao().getByPlaylistIdAndSourceId(playlistId, row.sourceId)
+            if (binding != null && row.remoteOrdinal != null && isLocalIndexedSource(row.sourceId)) {
+                if (database.importSourceDao().getById(row.sourceId)?.isEmbySource() == true) {
+                    removeEmbyTrackFromPlaylist(
+                        playlist = playlist,
+                        binding = binding,
+                        row = row,
+                    )
+                } else {
+                    val resolvedSource = resolveSubsonicCompatibleSource(row.sourceId)
+                        ?: error("Subsonic-compatible 来源不可用，无法更新歌单。")
+                    requestNavidromeJson(
+                        httpClient = httpClient,
+                        source = resolvedSource,
+                        endpoint = "updatePlaylist",
+                        parameters = mapOf(
+                            "playlistId" to binding.remotePlaylistId,
+                            "songIndexToRemove" to row.remoteOrdinal.toString(),
+                        ),
+                        logger = logger,
+                        logContext = "playlist=\"${playlist.name}\" remove track=$trackId",
+                    )
+                    syncRemoteBinding(
+                        playlist = playlist,
+                        sourceId = row.sourceId,
+                        remotePlaylistId = binding.remotePlaylistId,
+                        remoteName = binding.remoteName,
+                    )
+                }
+            } else {
+                database.playlistTrackDao().deleteByPlaylistIdAndTrackId(playlistId, trackId)
+                touchPlaylist(playlist)
+                cleanupPlaylistIfNecessary(playlistId)
             }
         }
     }
-}
 
-@Composable
-private fun PlaylistImportIssueGroup(
-    title: String,
-    lines: List<String>,
-) {
-    if (lines.isEmpty()) return
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(
-            text = title,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontWeight = FontWeight.SemiBold,
-            style = MaterialTheme.typography.bodySmall,
+    override suspend fun reorderPlaylists(orderedPlaylistIds: List<String>): Result<Unit> {
+        return runCatching {
+            orderedPlaylistIds.forEachIndexed { index, playlistId ->
+                database.playlistDao().updateCustomOrder(playlistId, index)
+            }
+        }
+    }
+
+    override val playlistSortMode: Flow<String?> =
+        database.playlistPreferenceDao().observeValue(PLAYLIST_SORT_MODE_KEY)
+
+    override suspend fun setPlaylistSortMode(mode: String) {
+        database.playlistPreferenceDao().upsert(
+            PlaylistPreferenceEntity(
+                prefKey = PLAYLIST_SORT_MODE_KEY,
+                prefValue = mode,
+            ),
         )
-        lines.forEach { line ->
-            Text(
-                text = line,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodySmall,
+    }
+
+    override suspend fun clearPlaylistCustomOrder(): Result<Unit> {
+        return runCatching {
+            database.playlistDao().clearCustomOrder()
+        }
+    }
+
+    override suspend fun refreshNavidromePlaylists(): Result<Unit> {
+        return runCatching {
+            val remoteSources = database.importSourceDao().getAll()
+                .filter { it.subsonicCompatibleSourceType() != null || it.isEmbySource() }
+            cleanupRemovedRemoteSources(remoteSources.mapTo(linkedSetOf()) { it.id })
+            val failures = mutableListOf<String>()
+            remoteSources
+                .filter { it.isLocalIndexedEnabled() }
+                .forEach { source ->
+                runCatching {
+                    if (source.isEmbySource()) {
+                        syncEmbySourcePlaylists(source)
+                    } else {
+                        syncSourcePlaylists(source)
+                    }
+                }
+                    .onFailure { throwable ->
+                        failures += "${source.label}: ${throwable.message.orEmpty()}"
+                    }
+            }
+            if (failures.isNotEmpty()) {
+                error(failures.joinToString("\n"))
+            }
+        }
+    }
+
+    private suspend fun addLocalTrackToPlaylist(
+        playlist: PlaylistEntity,
+        track: Track,
+    ) {
+        val nextOrdinal = database.playlistTrackDao().getByPlaylistId(playlist.id)
+            .mapNotNull { it.localOrdinal }
+            .maxOrNull()
+            ?.plus(1)
+            ?: 0
+        database.playlistTrackDao().upsert(
+            PlaylistTrackEntity(
+                playlistId = playlist.id,
+                trackId = track.id,
+                sourceId = track.sourceId,
+                addedAt = now(),
+                localOrdinal = nextOrdinal,
+                remoteOrdinal = null,
+            ),
+        )
+        touchPlaylist(playlist)
+    }
+
+    private suspend fun addSubsonicCompatibleTrackToPlaylist(
+        playlist: PlaylistEntity,
+        track: Track,
+        songId: String,
+    ) {
+        val resolvedSource = resolveSubsonicCompatibleSource(track.sourceId)
+            ?: error("Subsonic-compatible 来源不可用，无法更新歌单。")
+        val binding = ensureRemoteBinding(
+            playlist = playlist,
+            sourceId = track.sourceId,
+            resolvedSource = resolvedSource,
+        )
+        requestNavidromeJson(
+            httpClient = httpClient,
+            source = resolvedSource,
+            endpoint = "updatePlaylist",
+            parameters = mapOf(
+                "playlistId" to binding.remotePlaylistId,
+                "songIdToAdd" to songId,
+            ),
+            logger = logger,
+            logContext = "playlist=\"${playlist.name}\" add track=${track.id}",
+        )
+        syncRemoteBinding(
+            playlist = playlist,
+            sourceId = track.sourceId,
+            remotePlaylistId = binding.remotePlaylistId,
+            remoteName = binding.remoteName,
+        )
+    }
+
+    private suspend fun addEmbyTrackToPlaylist(
+        playlist: PlaylistEntity,
+        track: Track,
+        itemId: String,
+    ) {
+        val resolvedSource = resolveEmbySource(database, secureCredentialStore, track.sourceId, addressSelector)
+            ?: error("Emby 来源不可用，无法更新歌单。")
+        val binding = ensureEmbyRemoteBinding(
+            playlist = playlist,
+            sourceId = track.sourceId,
+            resolvedSource = resolvedSource,
+        )
+        addEmbyPlaylistItem(
+            httpClient = httpClient,
+            source = resolvedSource,
+            playlistId = binding.remotePlaylistId,
+            itemId = itemId,
+            logger = logger,
+        )
+        syncEmbyRemoteBinding(
+            playlist = playlist,
+            sourceId = track.sourceId,
+            remotePlaylistId = binding.remotePlaylistId,
+            remoteName = binding.remoteName,
+        )
+    }
+
+    private suspend fun removeEmbyTrackFromPlaylist(
+        playlist: PlaylistEntity,
+        binding: PlaylistRemoteBindingEntity,
+        row: PlaylistTrackEntity,
+    ) {
+        val resolvedSource = resolveEmbySource(database, secureCredentialStore, row.sourceId, addressSelector)
+            ?: error("Emby 来源不可用，无法更新歌单。")
+        val entries = fetchEmbyPlaylistEntries(
+            httpClient = httpClient,
+            source = resolvedSource,
+            playlistId = binding.remotePlaylistId,
+            logger = logger,
+        )
+        val entry = entries.getOrNull(row.remoteOrdinal ?: -1)
+            ?.takeIf { embyTrackIdFor(row.sourceId, it.itemId) == row.trackId }
+            ?: entries.firstOrNull { embyTrackIdFor(row.sourceId, it.itemId) == row.trackId }
+            ?: error("Emby 远端歌单未找到要移除的歌曲。")
+        val entryId = entry.playlistItemId ?: error("Emby 远端歌单缺少可移除条目 ID。")
+        removeEmbyPlaylistEntries(
+            httpClient = httpClient,
+            source = resolvedSource,
+            playlistId = binding.remotePlaylistId,
+            entryIds = listOf(entryId),
+            logger = logger,
+        )
+        syncEmbyRemoteBinding(
+            playlist = playlist,
+            sourceId = row.sourceId,
+            remotePlaylistId = binding.remotePlaylistId,
+            remoteName = binding.remoteName,
+        )
+    }
+
+    private suspend fun ensureRemoteBinding(
+        playlist: PlaylistEntity,
+        sourceId: String,
+        resolvedSource: NavidromeResolvedSource,
+    ): PlaylistRemoteBindingEntity {
+        database.playlistRemoteBindingDao().getByPlaylistIdAndSourceId(playlist.id, sourceId)?.let { return it }
+
+        val remotePlaylist = fetchSourcePlaylists(resolvedSource)
+            .firstOrNull { normalizePlaylistName(it.name) == playlist.normalizedName }
+            ?: run {
+                requestNavidromeJson(
+                    httpClient = httpClient,
+                    source = resolvedSource,
+                    endpoint = "createPlaylist",
+                    parameters = mapOf("name" to playlist.name),
+                    logger = logger,
+                    logContext = "playlist=\"${playlist.name}\" create",
+                )
+                fetchSourcePlaylists(resolvedSource)
+                    .firstOrNull { normalizePlaylistName(it.name) == playlist.normalizedName }
+            }
+            ?: error("远端歌单创建失败。")
+
+        val binding = PlaylistRemoteBindingEntity(
+            playlistId = playlist.id,
+            sourceId = sourceId,
+            remotePlaylistId = remotePlaylist.id,
+            remoteName = remotePlaylist.name,
+            lastSyncedAt = null,
+        )
+        database.playlistRemoteBindingDao().upsert(binding)
+        return binding
+    }
+
+    private suspend fun ensureEmbyRemoteBinding(
+        playlist: PlaylistEntity,
+        sourceId: String,
+        resolvedSource: top.iwesley.lyn.music.domain.EmbyResolvedSource,
+    ): PlaylistRemoteBindingEntity {
+        database.playlistRemoteBindingDao().getByPlaylistIdAndSourceId(playlist.id, sourceId)?.let { return it }
+
+        val remotePlaylist = fetchEmbyPlaylists(httpClient, resolvedSource, logger)
+            .firstOrNull { normalizePlaylistName(it.name) == playlist.normalizedName }
+            ?: createEmbyPlaylist(
+                httpClient = httpClient,
+                source = resolvedSource,
+                name = playlist.name,
+                logger = logger,
+            )
+
+        val binding = PlaylistRemoteBindingEntity(
+            playlistId = playlist.id,
+            sourceId = sourceId,
+            remotePlaylistId = remotePlaylist.id,
+            remoteName = remotePlaylist.name,
+            lastSyncedAt = null,
+        )
+        database.playlistRemoteBindingDao().upsert(binding)
+        return binding
+    }
+
+    private suspend fun syncSourcePlaylists(source: ImportSourceEntity) {
+        val resolvedSource = source.toSubsonicCompatibleResolvedSource()
+            ?: error("Subsonic-compatible 来源缺少有效凭据，无法同步歌单。")
+        val remotePlaylists = fetchSourcePlaylists(resolvedSource)
+        val remoteIds = remotePlaylists.mapTo(linkedSetOf()) { it.id }
+        val existingBindingsByRemoteId = database.playlistRemoteBindingDao().getBySourceId(source.id)
+            .associateBy { it.remotePlaylistId }
+        val playlistsByNormalizedName = database.playlistDao().getAll()
+            .associateBy { it.normalizedName }
+            .toMutableMap()
+
+        remotePlaylists.forEach { remotePlaylist ->
+            val existingBinding = existingBindingsByRemoteId[remotePlaylist.id]
+            val currentPlaylist = existingBinding?.let { database.playlistDao().getById(it.playlistId) }
+                ?: playlistsByNormalizedName[normalizePlaylistName(remotePlaylist.name)]
+            val playlist = currentPlaylist ?: PlaylistEntity(
+                id = newId("playlist"),
+                name = remotePlaylist.name,
+                normalizedName = normalizePlaylistName(remotePlaylist.name),
+                createdLocally = false,
+                createdAt = now(),
+                updatedAt = now(),
+            )
+            if (currentPlaylist == null) {
+                database.playlistDao().upsert(playlist)
+                playlistsByNormalizedName[playlist.normalizedName] = playlist
+            }
+            syncRemoteBinding(
+                playlist = playlist,
+                sourceId = source.id,
+                remotePlaylistId = remotePlaylist.id,
+                remoteName = remotePlaylist.name,
             )
         }
+
+        existingBindingsByRemoteId.values
+            .filter { it.remotePlaylistId !in remoteIds }
+            .forEach { binding ->
+                database.playlistRemoteBindingDao().deleteByPlaylistIdAndSourceId(binding.playlistId, binding.sourceId)
+                database.playlistTrackDao().deleteByPlaylistIdAndSourceId(binding.playlistId, binding.sourceId)
+                cleanupPlaylistIfNecessary(binding.playlistId)
+        }
+    }
+
+    private suspend fun syncEmbySourcePlaylists(source: ImportSourceEntity) {
+        val resolvedSource = resolveEmbySource(database, secureCredentialStore, source.id, addressSelector)
+            ?: error("Emby 来源缺少有效凭据，无法同步歌单。")
+        val remotePlaylists = fetchEmbyPlaylists(
+            httpClient = httpClient,
+            source = resolvedSource,
+            logger = logger,
+        )
+        val remoteIds = remotePlaylists.mapTo(linkedSetOf()) { it.id }
+        val existingBindingsByRemoteId = database.playlistRemoteBindingDao().getBySourceId(source.id)
+            .associateBy { it.remotePlaylistId }
+        val playlistsByNormalizedName = database.playlistDao().getAll()
+            .associateBy { it.normalizedName }
+            .toMutableMap()
+
+        remotePlaylists.forEach { remotePlaylist ->
+            val existingBinding = existingBindingsByRemoteId[remotePlaylist.id]
+            val currentPlaylist = existingBinding?.let { database.playlistDao().getById(it.playlistId) }
+                ?: playlistsByNormalizedName[normalizePlaylistName(remotePlaylist.name)]
+            val playlist = currentPlaylist ?: PlaylistEntity(
+                id = newId("playlist"),
+                name = remotePlaylist.name,
+                normalizedName = normalizePlaylistName(remotePlaylist.name),
+                createdLocally = false,
+                createdAt = now(),
+                updatedAt = now(),
+            )
+            if (currentPlaylist == null) {
+                database.playlistDao().upsert(playlist)
+                playlistsByNormalizedName[playlist.normalizedName] = playlist
+            }
+            syncEmbyRemoteBinding(
+                playlist = playlist,
+                sourceId = source.id,
+                remotePlaylistId = remotePlaylist.id,
+                remoteName = remotePlaylist.name,
+            )
+        }
+
+        existingBindingsByRemoteId.values
+            .filter { it.remotePlaylistId !in remoteIds }
+            .forEach { binding ->
+                database.playlistRemoteBindingDao().deleteByPlaylistIdAndSourceId(binding.playlistId, binding.sourceId)
+                database.playlistTrackDao().deleteByPlaylistIdAndSourceId(binding.playlistId, binding.sourceId)
+                cleanupPlaylistIfNecessary(binding.playlistId)
+            }
+    }
+
+    private suspend fun syncRemoteBinding(
+        playlist: PlaylistEntity,
+        sourceId: String,
+        remotePlaylistId: String,
+        remoteName: String,
+    ) {
+        val resolvedSource = resolveSubsonicCompatibleSource(sourceId)
+            ?: error("Subsonic-compatible 来源不可用，无法同步歌单。")
+        val remoteEntries = fetchRemotePlaylistEntries(
+            resolvedSource = resolvedSource,
+            remotePlaylistId = remotePlaylistId,
+        )
+        val nextRows = remoteEntries.mapIndexed { index, entry ->
+            PlaylistTrackEntity(
+                playlistId = playlist.id,
+                trackId = subsonicCompatibleTrackIdFor(sourceId, entry.songId, resolvedSource.sourceType),
+                sourceId = sourceId,
+                addedAt = now(),
+                localOrdinal = null,
+                remoteOrdinal = index,
+            )
+        }
+        database.immediateWriteTransaction {
+            val currentRemoteTrackOrder = database.playlistTrackDao().getByPlaylistIdAndSourceId(playlist.id, sourceId)
+                .sortedBy { it.remoteOrdinal ?: Int.MAX_VALUE }
+                .map { RemotePlaylistTrackSnapshot(trackId = it.trackId, remoteOrdinal = it.remoteOrdinal ?: -1) }
+            val nextRemoteTrackOrder = nextRows.map {
+                RemotePlaylistTrackSnapshot(trackId = it.trackId, remoteOrdinal = it.remoteOrdinal ?: -1)
+            }
+            val tracksChanged = currentRemoteTrackOrder != nextRemoteTrackOrder
+            if (tracksChanged) {
+                database.playlistTrackDao().deleteByPlaylistIdAndSourceId(playlist.id, sourceId)
+                if (nextRows.isNotEmpty()) {
+                    database.playlistTrackDao().upsertAll(nextRows)
+                }
+            }
+            database.playlistRemoteBindingDao().upsert(
+                PlaylistRemoteBindingEntity(
+                    playlistId = playlist.id,
+                    sourceId = sourceId,
+                    remotePlaylistId = remotePlaylistId,
+                    remoteName = remoteName,
+                    lastSyncedAt = now(),
+                ),
+            )
+            if (tracksChanged) {
+                touchPlaylist(playlist)
+            }
+        }
+    }
+
+    private suspend fun syncEmbyRemoteBinding(
+        playlist: PlaylistEntity,
+        sourceId: String,
+        remotePlaylistId: String,
+        remoteName: String,
+    ) {
+        val resolvedSource = resolveEmbySource(database, secureCredentialStore, sourceId, addressSelector)
+            ?: error("Emby 来源不可用，无法同步歌单。")
+        val remoteEntries = fetchEmbyPlaylistEntries(
+            httpClient = httpClient,
+            source = resolvedSource,
+            playlistId = remotePlaylistId,
+            logger = logger,
+        )
+        val nextRows = remoteEntries.mapIndexed { index, entry ->
+            PlaylistTrackEntity(
+                playlistId = playlist.id,
+                trackId = embyTrackIdFor(sourceId, entry.itemId),
+                sourceId = sourceId,
+                addedAt = now(),
+                localOrdinal = null,
+                remoteOrdinal = index,
+            )
+        }
+        database.immediateWriteTransaction {
+            val currentRemoteTrackOrder = database.playlistTrackDao().getByPlaylistIdAndSourceId(playlist.id, sourceId)
+                .sortedBy { it.remoteOrdinal ?: Int.MAX_VALUE }
+                .map { RemotePlaylistTrackSnapshot(trackId = it.trackId, remoteOrdinal = it.remoteOrdinal ?: -1) }
+            val nextRemoteTrackOrder = nextRows.map {
+                RemotePlaylistTrackSnapshot(trackId = it.trackId, remoteOrdinal = it.remoteOrdinal ?: -1)
+            }
+            val tracksChanged = currentRemoteTrackOrder != nextRemoteTrackOrder
+            if (tracksChanged) {
+                database.playlistTrackDao().deleteByPlaylistIdAndSourceId(playlist.id, sourceId)
+                if (nextRows.isNotEmpty()) {
+                    database.playlistTrackDao().upsertAll(nextRows)
+                }
+            }
+            database.playlistRemoteBindingDao().upsert(
+                PlaylistRemoteBindingEntity(
+                    playlistId = playlist.id,
+                    sourceId = sourceId,
+                    remotePlaylistId = remotePlaylistId,
+                    remoteName = remoteName,
+                    lastSyncedAt = now(),
+                ),
+            )
+            if (tracksChanged) {
+                touchPlaylist(playlist)
+            }
+        }
+    }
+
+    private suspend fun cleanupRemovedRemoteSources(activeSourceIds: Set<String>) {
+        database.playlistRemoteBindingDao().getAll()
+            .filter { it.sourceId !in activeSourceIds }
+            .forEach { binding ->
+                database.playlistRemoteBindingDao().deleteByPlaylistIdAndSourceId(binding.playlistId, binding.sourceId)
+                database.playlistTrackDao().deleteByPlaylistIdAndSourceId(binding.playlistId, binding.sourceId)
+                cleanupPlaylistIfNecessary(binding.playlistId)
+            }
+    }
+
+    private suspend fun cleanupPlaylistIfNecessary(playlistId: String) {
+        val playlist = database.playlistDao().getById(playlistId) ?: return
+        val hasTracks = database.playlistTrackDao().getByPlaylistId(playlistId).isNotEmpty()
+        val hasBindings = database.playlistRemoteBindingDao().getAll().any { it.playlistId == playlistId }
+        if (!playlist.createdLocally && !hasTracks && !hasBindings) {
+            database.playlistDao().deleteById(playlistId)
+        }
+    }
+
+    private suspend fun deleteLocalPlaylist(playlistId: String) {
+        database.playlistRemoteBindingDao().deleteByPlaylistId(playlistId)
+        database.playlistTrackDao().deleteByPlaylistId(playlistId)
+        database.playlistDao().deleteById(playlistId)
+    }
+
+    private suspend fun touchPlaylist(playlist: PlaylistEntity) {
+        database.playlistDao().upsert(playlist.copy(updatedAt = now()))
+    }
+
+    private suspend fun fetchSourcePlaylists(
+        resolvedSource: NavidromeResolvedSource,
+    ): List<NavidromePlaylistSummaryPayload> {
+        val payload = requestNavidromeJson(
+            httpClient = httpClient,
+            source = resolvedSource,
+            endpoint = "getPlaylists",
+            logger = logger,
+        )
+        return payload["playlists"].asJsonObjectOrNull()
+            ?.get("playlist")
+            .asJsonObjectList()
+            .mapNotNull { playlist ->
+                val id = playlist.string("id") ?: return@mapNotNull null
+                val name = playlist.string("name")?.trim().orEmpty().ifBlank { "未命名歌单" }
+                NavidromePlaylistSummaryPayload(
+                    id = id,
+                    name = name,
+                )
+            }
+    }
+
+    private suspend fun fetchRemotePlaylistEntries(
+        resolvedSource: NavidromeResolvedSource,
+        remotePlaylistId: String,
+    ): List<NavidromePlaylistEntryPayload> {
+        val payload = requestNavidromeJson(
+            httpClient = httpClient,
+            source = resolvedSource,
+            endpoint = "getPlaylist",
+            parameters = mapOf("id" to remotePlaylistId),
+            logger = logger,
+            logContext = "playlistId=$remotePlaylistId",
+        )
+        return payload["playlist"].asJsonObjectOrNull()
+            ?.get("entry")
+            .asJsonObjectList()
+            .mapNotNull { entry ->
+                val songId = entry.string("id") ?: return@mapNotNull null
+                NavidromePlaylistEntryPayload(songId = songId)
+            }
+    }
+
+    private suspend fun localPlaylistMutationRemoteBindings(
+        playlist: PlaylistEntity,
+        bindings: List<PlaylistRemoteBindingEntity>,
+    ): List<PlaylistRemoteBindingEntity> {
+        if (bindings.isEmpty()) return emptyList()
+        val sourcesById = database.importSourceDao()
+            .getAll()
+            .associateBy { it.id }
+        return bindings.filter { binding ->
+            val source = sourcesById[binding.sourceId] ?: return@filter false
+            source.isLocalIndexedEnabled() ||
+                (playlist.createdLocally && source.enabled && source.supportsRemotePlaylistMutations())
+        }
+    }
+
+    private suspend fun isLocalIndexedSource(sourceId: String): Boolean {
+        return database.importSourceDao().getById(sourceId)?.isLocalIndexedEnabled() == true
+    }
+
+    private suspend fun resolveSubsonicCompatibleSource(
+        sourceId: String,
+        requireLocalIndex: Boolean = true,
+    ): NavidromeResolvedSource? {
+        val source = database.importSourceDao().getById(sourceId)
+            ?.takeIf {
+                it.subsonicCompatibleSourceType() != null &&
+                    (!requireLocalIndex || it.isLocalIndexedEnabled())
+            }
+            ?: return null
+        return source.toSubsonicCompatibleResolvedSource()
+    }
+
+    private suspend fun ImportSourceEntity.toSubsonicCompatibleResolvedSource(): NavidromeResolvedSource? {
+        val sourceType = subsonicCompatibleSourceType() ?: return null
+        val authMode = authMode.toSubsonicAuthMode()
+        val username = username?.trim().orEmpty()
+        val credential = credentialKey?.let { secureCredentialStore.get(it) }.orEmpty()
+        if (authMode == SubsonicAuthMode.PASSWORD && (username.isBlank() || credential.isBlank())) return null
+        if (authMode == SubsonicAuthMode.API_KEY && credential.isBlank()) return null
+        return NavidromeResolvedSource(
+            baseUrl = rootReference,
+            wanBaseUrl = wanRootReference,
+            sourceId = id,
+            addressSelector = addressSelector,
+            username = username,
+            password = credential,
+            authMode = authMode,
+            sourceType = sourceType,
+        )
+    }
+
+    private fun ImportSourceEntity.subsonicCompatibleSourceType(): ImportSourceType? {
+        val sourceType = runCatching { ImportSourceType.valueOf(type) }.getOrNull() ?: return null
+        return sourceType.takeIf(::isSubsonicCompatibleSourceType)
+    }
+
+    private fun ImportSourceEntity.isEmbySource(): Boolean {
+        return type == ImportSourceType.EMBY.name
+    }
+
+    private fun ImportSourceEntity.supportsRemotePlaylistMutations(): Boolean {
+        return isEmbySource() || subsonicCompatibleSourceType() != null
     }
 }
 
-internal fun canConfirmPlaylistImport(
-    text: String,
-    isImporting: Boolean,
-): Boolean = text.trim().isNotEmpty() && !isImporting
+private fun PlaylistEntity.toSummary(
+    memberTrackIds: Set<String> = emptySet(),
+    artworkLocator: String? = null,
+    artworkCacheKey: String? = null,
+): PlaylistSummary {
+    return PlaylistSummary(
+        id = id,
+        name = name,
+        kind = PlaylistKind.USER,
+        trackCount = memberTrackIds.size,
+        updatedAt = updatedAt,
+        memberTrackIds = memberTrackIds,
+        artworkLocator = artworkLocator,
+        artworkCacheKey = artworkCacheKey,
+        customOrder = customOrder,
+    )
+}
 
-internal fun canShowPlaylistImportAction(detail: PlaylistDetail?): Boolean = detail != null
+private fun PlaylistEntity.isVisibleInLocalPlaylistBrowser(
+    visiblePlaylistTracks: List<PlaylistTrackEntity>,
+    remoteBindings: List<PlaylistRemoteBindingEntity>,
+    localIndexedSourceIds: Set<String>,
+): Boolean {
+    if (createdLocally) return true
+    if (visiblePlaylistTracks.any { it.playlistId == id }) return true
+    return remoteBindings.any { binding ->
+        binding.playlistId == id && binding.sourceId in localIndexedSourceIds
+    }
+}
 
-internal const val PlaylistImportAssistantUrl = "https://music.unmeta.cn/"
-
-internal data class PlaylistImportDialogLayout(
-    val outerHorizontalPadding: Dp,
-    val outerVerticalPadding: Dp,
-    val contentHorizontalPadding: Dp,
-    val contentVerticalPadding: Dp,
-    val verticalSpacing: Dp,
-    val maxHeight: Dp,
-    val textFieldLines: Int,
+private data class PlaylistSummaryArtwork(
+    val locator: String,
+    val cacheKey: String?,
 )
 
-internal fun playlistImportDialogLayout(
-    maxWidth: Dp,
-    maxHeight: Dp,
-): PlaylistImportDialogLayout {
-    val outerHorizontalPadding = when {
-        maxWidth < 360.dp -> 12.dp
-        maxWidth < 430.dp -> 16.dp
-        else -> 20.dp
-    }
-    val outerVerticalPadding = when {
-        maxHeight < 460.dp -> 8.dp
-        maxHeight < 620.dp -> 16.dp
-        else -> 24.dp
-    }
-    val contentHorizontalPadding = when {
-        maxWidth < 360.dp || maxHeight < 460.dp -> 16.dp
-        maxHeight < 620.dp -> 20.dp
-        else -> 24.dp
-    }
-    val contentVerticalPadding = when {
-        maxHeight < 460.dp -> 14.dp
-        maxHeight < 620.dp -> 18.dp
-        else -> 22.dp
-    }
-    val availableHeight = maxDp(280.dp, maxHeight - outerVerticalPadding - outerVerticalPadding)
-    val scaledHeightCap = maxDp(320.dp, maxHeight * 0.78f)
-    val dialogMaxHeight = minDp(playlistImportDialogMaxHeight(), minDp(availableHeight, scaledHeightCap))
-    return PlaylistImportDialogLayout(
-        outerHorizontalPadding = outerHorizontalPadding,
-        outerVerticalPadding = outerVerticalPadding,
-        contentHorizontalPadding = contentHorizontalPadding,
-        contentVerticalPadding = contentVerticalPadding,
-        verticalSpacing = if (dialogMaxHeight < 420.dp) 10.dp else 14.dp,
-        maxHeight = dialogMaxHeight,
-        textFieldLines = playlistImportTextFieldLines(dialogMaxHeight),
-    )
-}
-
-internal fun playlistImportTextFieldLines(dialogHeight: Dp): Int {
-    return when {
-        dialogHeight < 360.dp -> 2
-        dialogHeight < 440.dp -> 3
-        dialogHeight < 520.dp -> 4
-        else -> 6
-    }
-}
-
-internal fun playlistImportDialogMaxHeight(): Dp = 560.dp
-
-private fun minDp(first: Dp, second: Dp): Dp = if (first < second) first else second
-
-private fun maxDp(first: Dp, second: Dp): Dp = if (first > second) first else second
-
-internal fun playlistImportReportSummary(report: PlaylistImportReport): String {
-    val parts = mutableListOf("已加入 ${report.addedCount} 首")
-    if (report.alreadyExistsCount > 0) {
-        parts += "已存在 ${report.alreadyExistsCount} 首"
-    }
-    if (report.duplicateInputCount > 0) {
-        parts += "重复 ${report.duplicateInputCount} 首"
-    }
-    val issueCount = report.malformedLines.size +
-        report.notMatchedLines.size +
-        report.ambiguousLines.size +
-        report.failedLines.size
-    if (issueCount > 0) {
-        parts += "未导入 $issueCount 行"
-    }
-    return parts.joinToString("，")
-}
-
-private fun formatPlaylistImportLineIssue(
-    issue: top.iwesley.lyn.music.data.repository.PlaylistImportLineIssue,
-): String {
-    return "第 ${issue.lineNumber} 行：${issue.rawText}"
-}
-
-@Composable
-@OptIn(ExperimentalLayoutApi::class)
-private fun PlaylistDetailPane(
-    detail: PlaylistDetail?,
-    isLoadingContent: Boolean,
-    isDetailSwitchLoading: Boolean,
-    requestedPlaylistName: String?,
-    hasTracksOutsideFilter: Boolean,
-    onBack: () -> Unit,
-    onPlayAll: (List<Track>) -> Unit,
-    onPlayTrack: (List<Track>, Int) -> Unit,
-    isImportingPlaylist: Boolean,
-    onImportPlaylist: () -> Unit,
-    showImportPlaylistAction: Boolean = true,
-    onRemoveTrack: (String, Int) -> Unit,
-    showTrackDuration: Boolean,
-    allowLocalIndexActions: Boolean = true,
-    modifier: Modifier = Modifier,
-    showBackButton: Boolean,
-    batchSelectionRequestKey: Int = 0,
-    showInlineBatchOperationButton: Boolean = true,
-) {
-    var selectionMode by rememberSaveable(detail?.id) { mutableStateOf(false) }
-    var selectedTrackIds by rememberSaveable(detail?.id) { mutableStateOf(emptyList<String>()) }
-    var batchQualitySheetVisible by rememberSaveable(detail?.id) { mutableStateOf(false) }
-    var lastHandledBatchSelectionRequestKey by rememberSaveable { mutableStateOf(0) }
-    var pendingBatchDownloadTracks by remember { mutableStateOf(emptyList<Track>()) }
-    val visibleTracks = detail?.tracks?.map { it.track }.orEmpty()
-    val selectedBatchTracks = remember(visibleTracks, selectedTrackIds) {
-        selectedTracksInVisibleOrder(visibleTracks, selectedTrackIds)
-    }
-    val allVisibleTracksSelected = visibleTracks.isNotEmpty() && visibleTracks.all { it.id in selectedTrackIds }
-    val offlineUiState = LocalOfflineDownloadUiState.current
-    val onOfflineDownloadIntent = offlineUiState.onIntent
-    val selectedBatchDownloadSizeEstimate = remember(
-        selectedBatchTracks,
-        offlineUiState.downloadsByTrackId,
-    ) {
-        estimateBatchDownloadSize(
-            tracks = selectedBatchTracks,
-            downloadsByTrackId = offlineUiState.downloadsByTrackId,
-        )
-    }
-    val supportsBatchDownload = allowLocalIndexActions && supportsBatchOfflineDownloadActions() && onOfflineDownloadIntent != null
-    val inlineBatchOperationButtonVisible = showInlineBatchOperationButton
-    fun exitSelectionMode() {
-        selectionMode = false
-        selectedTrackIds = emptyList()
-        batchQualitySheetVisible = false
-        pendingBatchDownloadTracks = emptyList()
-    }
-    fun startBatchDownload(tracks: List<Track>, quality: NavidromeAudioQuality) {
-        val insufficientSpaceMessage = batchDownloadInsufficientSpaceMessage(
-            estimate = estimateBatchDownloadSize(
-                tracks = tracks,
-                downloadsByTrackId = offlineUiState.downloadsByTrackId,
-                quality = quality,
-            ),
-            availableSpaceBytes = offlineUiState.availableSpaceBytes,
-        )
-        if (insufficientSpaceMessage != null) {
-            if (batchQualitySheetVisible) {
-                batchQualitySheetVisible = false
-                pendingBatchDownloadTracks = emptyList()
-            }
-            onOfflineDownloadIntent?.invoke(OfflineDownloadIntent.ShowMessage(insufficientSpaceMessage))
-            return
-        }
-        onOfflineDownloadIntent?.invoke(OfflineDownloadIntent.DownloadMany(tracks, quality))
-        exitSelectionMode()
-    }
-    fun requestBatchDownload() {
-        val tracks = selectedBatchTracks
-        if (tracks.isEmpty()) return
-        if (hasNavidromeTracks(tracks)) {
-            pendingBatchDownloadTracks = tracks
-            batchQualitySheetVisible = true
-        } else {
-            startBatchDownload(tracks, NavidromeAudioQuality.Original)
-        }
-    }
-    PlatformBackHandler(enabled = selectionMode) {
-        exitSelectionMode()
-    }
-    LaunchedEffect(selectionMode, supportsBatchDownload) {
-        if (selectionMode && supportsBatchDownload) {
-            onOfflineDownloadIntent(OfflineDownloadIntent.RefreshAvailableSpace)
-        }
-    }
-    LaunchedEffect(visibleTracks) {
-        val pruned = pruneSelectedTrackIds(selectedTrackIds, visibleTracks)
-        if (pruned != selectedTrackIds) {
-            selectedTrackIds = pruned
-        }
-        if (selectionMode && visibleTracks.isEmpty()) {
-            exitSelectionMode()
-        }
-    }
-    LaunchedEffect(batchSelectionRequestKey, supportsBatchDownload, visibleTracks) {
-        if (batchSelectionRequestKey <= lastHandledBatchSelectionRequestKey) {
-            return@LaunchedEffect
-        }
-        val shouldEnterSelectionMode = shouldHandleBatchSelectionRequest(
-            requestKey = batchSelectionRequestKey,
-            lastHandledRequestKey = lastHandledBatchSelectionRequestKey,
-            supportsBatchDownload = supportsBatchDownload,
-            hasVisibleTracks = visibleTracks.isNotEmpty(),
-        )
-        lastHandledBatchSelectionRequestKey = batchSelectionRequestKey
-        if (shouldEnterSelectionMode) {
-            selectionMode = true
-        }
-    }
-    LazyColumn(
-        modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(20.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        item {
-            if (isDetailSwitchLoading) {
-                PlaylistDetailLoadingContent(
-                    requestedPlaylistName = requestedPlaylistName,
-                    showBackButton = showBackButton,
-                    onBack = onBack,
-                )
-            } else if (isLoadingContent && detail == null) {
-                EmptyStateCard(
-                    title = "正在加载歌单详情",
-                    body = "歌单列表和歌曲内容会在后台继续准备，请稍候。",
-                )
-            } else if (detail == null) {
-                EmptyStateCard(
-                    title = "选择一个歌单",
-                    body = "左侧会列出普通歌单，点击后可以查看歌曲并直接播放。",
-                )
-            } else {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    if (showBackButton) {
-                        TextButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null)
-                            Spacer(Modifier.width(6.dp))
-                            Text("返回歌单列表")
-                        }
-                    }
-                    PlaylistSectionTitle(
-                        title = detail.name,
-                        subtitle = "${detail.tracks.size} 首歌曲",
-                    )
-                    FlowRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        OutlinedButton(
-                            onClick = { onPlayAll(detail.tracks.map { it.track }) },
-                            enabled = detail.tracks.isNotEmpty(),
-                        ) {
-                            Icon(Icons.Rounded.PlayArrow, contentDescription = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text("播放全部")
-                        }
-                        if (showImportPlaylistAction) {
-                            OutlinedButton(
-                                onClick = onImportPlaylist,
-                                enabled = canShowPlaylistImportAction(detail) && !isImportingPlaylist,
-                            ) {
-                                Icon(Icons.AutoMirrored.Rounded.List, contentDescription = null)
-                                Spacer(Modifier.width(8.dp))
-                                Text(
-                                    text = if (isImportingPlaylist) "导入中" else "导入歌单",
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                        }
-                        if (
-                            supportsBatchDownload &&
-                            inlineBatchOperationButtonVisible &&
-                            !selectionMode &&
-                            detail.tracks.isNotEmpty()
-                        ) {
-                            BatchOperationButton(onClick = { selectionMode = true })
-                        }
-                    }
-                    if (selectionMode) {
-                        TrackSelectionActionBar(
-                            selectedCount = selectedBatchTracks.size,
-                            downloadSizeEstimateLabel = batchDownloadSizeEstimateLabel(selectedBatchDownloadSizeEstimate),
-                            allVisibleSelected = allVisibleTracksSelected,
-                            hasVisibleTracks = visibleTracks.isNotEmpty(),
-                            onToggleSelectAll = {
-                                selectedTrackIds = toggleAllVisibleTrackSelection(selectedTrackIds, visibleTracks)
-                            },
-                            onDownloadSelected = ::requestBatchDownload,
-                            onCancelSelection = ::exitSelectionMode,
-                        )
-                    }
-                }
-            }
-        }
-        when {
-            detail == null -> Unit
-            detail.tracks.isEmpty() -> item {
-                EmptyStateCard(
-                    title = if (hasTracksOutsideFilter) {
-                        "当前来源下没有歌曲"
-                    } else {
-                        "歌单还是空的"
-                    },
-                    body = if (hasTracksOutsideFilter) {
-                        "试试切回“${playlistSourceFilterButtonLabel(LibrarySourceFilter.ALL)}”，或更换其他来源筛选。"
-                    } else {
-                        "从播放器把当前歌曲加入这里后，就可以直接播放和管理了。"
-                    },
-                )
-            }
-
-            else -> itemsIndexed(detail.tracks, key = { _, item -> item.track.id }) { index, item ->
-                PlaylistTrackRow(
-                    entry = item,
-                    index = index,
-                    selectionMode = selectionMode,
-                    selected = item.track.id in selectedTrackIds,
-                    onSelectionToggle = {
-                        selectedTrackIds = toggleTrackSelection(selectedTrackIds, item.track.id)
-                    },
-                    onClick = { onPlayTrack(detail.tracks.map { it.track }, index) },
-                    onRemove = { onRemoveTrack(item.track.id, index) },
-                    showDuration = showTrackDuration,
-                )
-            }
-        }
-    }
-    if (batchQualitySheetVisible) {
-        BatchDownloadQualityBottomSheet(
-            selectedCount = pendingBatchDownloadTracks.size,
-            tracks = pendingBatchDownloadTracks,
-            downloadsByTrackId = offlineUiState.downloadsByTrackId,
-            onQualitySelected = { quality ->
-                startBatchDownload(pendingBatchDownloadTracks, quality)
-            },
-            onDismiss = {
-                batchQualitySheetVisible = false
-                pendingBatchDownloadTracks = emptyList()
-            },
-        )
-    }
-}
-
-@Composable
-private fun PlaylistDetailLoadingContent(
-    requestedPlaylistName: String?,
-    showBackButton: Boolean,
-    onBack: () -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        if (showBackButton) {
-            TextButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null)
-                Spacer(Modifier.width(6.dp))
-                Text("返回歌单列表")
-            }
-        }
-        Card(
-            shape = RoundedCornerShape(28.dp),
-            colors = CardDefaults.cardColors(containerColor = mainShellColors.cardContainer),
-            border = BorderStroke(1.dp, mainShellColors.cardBorder),
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 22.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.5.dp)
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("正在打开歌单", fontWeight = FontWeight.Bold)
-                    Text(
-                        text = requestedPlaylistName
-                            ?.takeIf { it.isNotBlank() }
-                            ?.let { "正在读取“$it”中的歌曲，请稍候。" }
-                            ?: "正在读取歌单中的歌曲，请稍候。",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-        }
-    }
-}
-
-private fun matchesPlaylistSourceFilter(
-    track: Track,
-    selectedSourceFilter: LibrarySourceFilter,
-    sourceTypesById: Map<String, ImportSourceType>,
-    offlineDownloadsByTrackId: Map<String, OfflineDownload>,
-): Boolean {
-    return matchesLibrarySourceFilter(
-        track = track,
-        selectedSourceFilter = selectedSourceFilter,
-        sourceTypesById = sourceTypesById,
-        offlineDownloadsByTrackId = offlineDownloadsByTrackId,
-    )
-}
-
-private fun playlistSourceFilterButtonLabel(filter: LibrarySourceFilter): String {
-    return when (filter) {
-        LibrarySourceFilter.ALL -> "全部来源"
-        LibrarySourceFilter.LOCAL_FOLDER -> "本地文件夹"
-        LibrarySourceFilter.SAMBA -> "Samba"
-        LibrarySourceFilter.WEBDAV -> "WebDAV"
-        LibrarySourceFilter.NAVIDROME -> "Navidrome"
-        LibrarySourceFilter.SUBSONIC -> "Subsonic"
-        LibrarySourceFilter.EMBY -> "Emby"
-        LibrarySourceFilter.DOWNLOADED -> "已下载"
-    }
-}
-
-private fun playlistSourceFilterMenuLabel(filter: LibrarySourceFilter): String {
-    return when (filter) {
-        LibrarySourceFilter.ALL -> "全部"
-        else -> playlistSourceFilterButtonLabel(filter)
-    }
-}
-
-@Composable
-private fun PlaylistTrackRow(
-    entry: top.iwesley.lyn.music.core.model.PlaylistTrackEntry,
-    index: Int,
-    selectionMode: Boolean = false,
-    selected: Boolean = false,
-    onSelectionToggle: (() -> Unit)? = null,
-    onClick: () -> Unit,
-    onRemove: () -> Unit,
-    showDuration: Boolean,
-) {
-    val shellColors = mainShellColors
-    val offlineDownload = LocalOfflineDownloadUiState.current.downloadsByTrackId[entry.track.id]
-    val offlineRowIndicatorState = offlineDownloadRowIndicatorState(offlineDownload)
-    val rowClick = if (selectionMode) {
-        onSelectionToggle ?: {}
-    } else {
-        onClick
-    }
-    val trailingWidth = playlistTrackTrailingWidth(selectionMode = selectionMode, showDuration = showDuration)
-    Column(modifier = Modifier.fillMaxWidth()) {
-        TrackActionContainer(
-            track = entry.track,
-            onClick = rowClick,
-            enableOfflineActions = !selectionMode,
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(18.dp))
-                .padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            if (selectionMode) {
-                Checkbox(
-                    checked = selected,
-                    onCheckedChange = { onSelectionToggle?.invoke() },
-                    modifier = Modifier.size(32.dp),
-                )
-            } else {
-                Text((index + 1).toString().padStart(2, '0'), fontWeight = FontWeight.Bold)
-            }
-            PlaylistArtworkThumbnail(
-                artworkLocator = entry.track.artworkLocator,
-                artworkCacheKey = trackArtworkCacheKey(entry.track),
+private fun List<PlaylistTrackEntity>.latestPlaylistArtwork(trackById: Map<String, Track>): PlaylistSummaryArtwork? {
+    var bestRow: PlaylistTrackEntity? = null
+    var bestArtwork: PlaylistSummaryArtwork? = null
+    for (row in this) {
+        val track = trackById[row.trackId] ?: continue
+        val locator = track.artworkLocator?.takeIf { it.isNotBlank() } ?: continue
+        val currentBest = bestRow
+        if (currentBest == null || row.isNewerPlaylistArtworkCandidateThan(currentBest)) {
+            bestRow = row
+            bestArtwork = PlaylistSummaryArtwork(
+                locator = locator,
+                cacheKey = trackArtworkCacheKey(track),
             )
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    entry.track.title,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    fontWeight = FontWeight.SemiBold,
+        }
+    }
+    return bestArtwork
+}
+
+private fun PlaylistTrackEntity.isNewerPlaylistArtworkCandidateThan(other: PlaylistTrackEntity): Boolean {
+    if (addedAt != other.addedAt) return addedAt > other.addedAt
+    return playlistArtworkOrdinal() > other.playlistArtworkOrdinal()
+}
+
+private fun PlaylistTrackEntity.playlistArtworkOrdinal(): Int {
+    return localOrdinal ?: remoteOrdinal ?: -1
+}
+
+private fun PlaylistEntity.toDetail(
+    tracks: List<PlaylistTrackEntity>,
+    trackById: Map<String, Track>,
+    sourceLabelById: Map<String, String>,
+): PlaylistDetail {
+    val orderedTracks = tracks
+        .filter { it.playlistId == id }
+        .sortedWith(
+            compareBy<PlaylistTrackEntity> { if (it.localOrdinal != null) 0 else 1 }
+                .thenBy { it.localOrdinal ?: Int.MAX_VALUE }
+                .thenBy { if (it.localOrdinal != null) "" else sourceLabelById[it.sourceId]?.lowercase().orEmpty() }
+                .thenBy { it.remoteOrdinal ?: Int.MAX_VALUE }
+                .thenBy { it.trackId },
+        )
+        .mapNotNull { row ->
+            trackById[row.trackId]?.let { track ->
+                PlaylistTrackEntry(
+                    track = track,
+                    sourceLabel = sourceLabelById[row.sourceId] ?: row.sourceId,
                 )
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        entry.track.artistName ?: "未知艺人",
-                        modifier = Modifier.weight(1f, fill = false),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    offlineRowIndicatorState?.let { OfflineDownloadRowIndicator(it) }
-                }
-            }
-            if (trailingWidth > 0.dp) {
-                Row(
-                    modifier = Modifier.width(trailingWidth),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    if (!selectionMode) {
-                        IconButton(
-                            onClick = onRemove,
-                            modifier = Modifier.size(48.dp),
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.Delete,
-                                contentDescription = "移出歌单",
-                                modifier = Modifier.size(24.dp),
-                            )
-                        }
-                    }
-                    if (showDuration) {
-                        Text(
-                            text = formatDuration(entry.track.durationMs),
-                            modifier = Modifier.width(56.dp),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.End,
-                            style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
-                        )
-                    }
-                }
             }
         }
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 88.dp)
-                .height(1.dp)
-                .background(shellColors.cardBorder),
-        )
-    }
-}
-
-internal fun playlistTrackTrailingWidth(
-    selectionMode: Boolean,
-    showDuration: Boolean,
-): Dp {
-    return when {
-        !selectionMode && showDuration -> 112.dp
-        !selectionMode -> 48.dp
-        showDuration -> 56.dp
-        else -> 0.dp
-    }
-}
-
-@Composable
-private fun PlaylistNameDialog(
-    onDismiss: () -> Unit,
-    onConfirm: (String) -> Unit,
-    title: String = "新建歌单",
-    initialName: String = "",
-    confirmText: String = "创建",
-) {
-    val shellColors = mainShellColors
-    var name by rememberSaveable(initialName) { mutableStateOf(initialName) }
-    val fieldColors = OutlinedTextFieldDefaults.colors(
-        focusedBorderColor = shellColors.cardBorder,
-        unfocusedBorderColor = shellColors.cardBorder,
-        disabledBorderColor = shellColors.cardBorder,
-    )
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = shellColors.navContainer,
-        iconContentColor = MaterialTheme.colorScheme.primary,
-        titleContentColor = MaterialTheme.colorScheme.onSurface,
-        textContentColor = MaterialTheme.colorScheme.onSurface,
-        tonalElevation = 0.dp,
-        shape = RoundedCornerShape(28.dp),
-        title = {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium.copy(
-                    fontSize = 18.sp,
-                    lineHeight = 24.sp,
-                ),
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        },
-        text = {
-            ImeAwareOutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = { Text("歌单名称") },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(18.dp),
-                colors = fieldColors,
-            )
-        },
-        confirmButton = {
-            TextButton(
-                onClick = { onConfirm(name) },
-                enabled = name.trim().isNotBlank(),
-            ) {
-                Text(
-                    text = confirmText,
-                    color = if (name.trim().isNotBlank()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("取消", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        },
+    return PlaylistDetail(
+        id = id,
+        name = name,
+        kind = PlaylistKind.USER,
+        updatedAt = updatedAt,
+        tracks = orderedTracks,
     )
 }
 
-@Composable
-private fun PlaylistSectionTitle(
-    title: String,
-    subtitle: String,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
-        Text(subtitle, color = mainShellColors.secondaryText)
+private fun normalizePlaylistName(name: String): String = name.trim().lowercase()
+
+private data class NavidromePlaylistSummaryPayload(
+    val id: String,
+    val name: String,
+)
+
+private data class NavidromePlaylistEntryPayload(
+    val songId: String,
+)
+
+private data class RemotePlaylistTrackSnapshot(
+    val trackId: String,
+    val remoteOrdinal: Int,
+)
+
+private const val PlaylistTextImportSqlBindLimit = 900
+private const val PlaylistTextImportSourceChunkSize = 100
+private const val PlaylistTextImportBindingsPerKey = 2
+
+private fun JsonElement?.asJsonObjectOrNull(): JsonObject? = this as? JsonObject
+
+private fun JsonElement?.asJsonObjectList(): List<JsonObject> {
+    return when (val element = this) {
+        is JsonArray -> element.mapNotNull { it as? JsonObject }
+        is JsonObject -> listOf(element)
+        else -> emptyList()
     }
 }
 
-@Composable
-private fun PlaylistArtworkThumbnail(
-    artworkLocator: String?,
-    artworkCacheKey: String? = null,
-    modifier: Modifier = Modifier,
-    cornerRadius: Dp = 1.dp,
-    containerColor: Color? = null,
-    fallbackTint: Color? = null,
-) {
-    val resolvedContainerColor = containerColor ?: mainShellColors.cardContainer
-    Box(
-        modifier = modifier
-            .size(52.dp)
-            .clip(RoundedCornerShape(cornerRadius))
-            .background(resolvedContainerColor)
-            .padding(0.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        LynArtworkImage(
-            artworkLocator = artworkLocator,
-            contentDescription = null,
-            artworkCacheKey = artworkCacheKey,
-            maxDecodeSizePx = ArtworkDecodeSize.Thumbnail,
-            modifier = Modifier.fillMaxSize(),
-            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
-        )
-    }
+private fun JsonObject.string(key: String): String? {
+    return (this[key] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
 }
