@@ -1,5 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="1024" android:viewportHeight="1024">
-    <path android:fillColor="#FFFFFF" android:pathData="M336,367 A69,69 0 0 1 474,367 L474,655 A69,69 0 0 1 336,655 Z"/>
-    <path android:fillColor="#FFFFFF" android:strokeColor="#FFFFFF" android:strokeWidth="54" android:strokeLineJoin="round" android:strokeLineCap="round" android:pathData="M474,588 L474,724 L712,656 Z"/>
+<!-- 单音符 ♪ : 108dp 画布，主体收敛在中心 66dp 安全圆内，不贴边 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillType="nonZero"
+        android:pathData="M30.84,75.29C28.86,69.84,33.14,63.28,40.41,60.63C47.67,57.99,55.17,60.26,57.16,65.71C59.14,71.16,54.86,77.72,47.59,80.37C40.33,83.01,32.83,80.74,30.84,75.29Z M57,25.5C57.88,25.5,58.32,25.5,59.2,25.5C60.08,25.5,60.8,70.02,60.8,70.9C60.8,71.78,57.88,72.5,57,72.5C56.12,72.5,55.4,27.98,55.4,27.1C55.4,26.22,56.12,25.5,57,25.5Z M60.8,25.5C69,26.5,78.5,40,76,55.5C73,44,66.5,38.5,55.6,36.5C55.6,36.5,60.8,25.5,60.8,25.5Z" />
 </vector>
