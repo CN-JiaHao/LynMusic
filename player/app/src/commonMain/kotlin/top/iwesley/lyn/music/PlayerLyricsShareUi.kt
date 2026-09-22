@@ -330,15 +330,18 @@ internal fun PlayerLyricsPane(
                         pure -> 600.dp
                         else -> 520.dp
                     }
+                    // 定制改动：手机竖屏歌词行距 12dp -> 14dp，
+                    // 原文与译文的间距 3dp -> 6dp（纯净模式 6dp -> 8dp），
+                    // 避免自定义双语 LRC 的原文和译文贴在一起糊成一行。
                     val lyricsLineSpacing = when {
-                        compact -> 12.dp
+                        compact -> 14.dp
                         pure -> 24.dp
                         else -> 16.dp
                     }
                     val translationLineSpacing = when {
-                        compact -> 3.dp
-                        pure -> 6.dp
-                        else -> 4.dp
+                        compact -> 6.dp
+                        pure -> 8.dp
+                        else -> 6.dp
                     }
                     LazyColumn(
                         modifier = Modifier
@@ -354,6 +357,9 @@ internal fun PlayerLyricsPane(
                             val translationText = enhancedLine?.translationText
                                 ?.trim()
                                 ?.takeIf { it.isNotEmpty() }
+                                ?: visibleLine.translationLine?.text
+                                    ?.trim()
+                                    ?.takeIf { it.isNotEmpty() }
                             val distance = if (activeHighlightedVisibleIndex >= 0) {
                                 abs(index - activeHighlightedVisibleIndex)
                             } else {
@@ -423,7 +429,8 @@ internal fun PlayerLyricsPane(
                                     Text(
                                         text = translationText,
                                         style = if (isHighlighted) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyLarge,
-                                        color = lyricsSecondaryTextColor.copy(alpha = if (isHighlighted) 0.9f else 0.72f),
+                                        // 定制改动：未高亮译文透明度 0.72 -> 0.84，小屏上更清楚
+                                        color = lyricsSecondaryTextColor.copy(alpha = if (isHighlighted) 0.92f else 0.84f),
                                         textAlign = TextAlign.Start,
                                         fontWeight = FontWeight.Normal,
                                         modifier = Modifier.fillMaxWidth(),
