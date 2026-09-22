@@ -36,6 +36,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -1356,6 +1357,7 @@ private fun PlayerOverlay(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
+                        .statusBarsPadding()
                         .padding(horizontal = 26.dp, vertical = 20.dp),
                     verticalArrangement = Arrangement.spacedBy(20.dp),
                 ) {
@@ -1384,7 +1386,7 @@ private fun PlayerOverlay(
                                     IconButton(
                                         onClick = { onPlayerIntent(PlayerIntent.OpenLyricsShare) },
                                         enabled = state.lyrics != null && !state.isLyricsLoading,
-                                        modifier = Modifier.size(52.dp),
+                                        modifier = Modifier.size(78.dp),
                                     ) {
                                         Icon(
                                             imageVector = Icons.Rounded.Share,
@@ -1394,29 +1396,29 @@ private fun PlayerOverlay(
                                             } else {
                                                 Color.White.copy(alpha = 0.42f)
                                             },
-                                            modifier = Modifier.size(24.dp),
+                                            modifier = Modifier.size(36.dp),
                                         )
                                     }
                                     IconButton(
                                         onClick = { onPlayerIntent(PlayerIntent.OpenManualLyricsSearch) },
-                                        modifier = Modifier.size(52.dp),
+                                        modifier = Modifier.size(78.dp),
                                     ) {
                                         Icon(
                                             imageVector = Icons.Rounded.Search,
                                             contentDescription = "手动搜索",
                                             tint = Color.White.copy(alpha = 0.92f),
-                                            modifier = Modifier.size(24.dp),
+                                            modifier = Modifier.size(36.dp),
                                         )
                                     }
                                     IconButton(
                                         onClick = { isPureModeRequested = true },
-                                        modifier = Modifier.size(52.dp),
+                                        modifier = Modifier.size(78.dp),
                                     ) {
                                         Icon(
                                             imageVector = Icons.Rounded.Fullscreen,
                                             contentDescription = "纯净模式",
                                             tint = Color.White.copy(alpha = 0.92f),
-                                            modifier = Modifier.size(24.dp),
+                                            modifier = Modifier.size(36.dp),
                                         )
                                     }
                                 }
@@ -2116,7 +2118,7 @@ private fun PlayerBottomControls(
                     Text(
                         text = track.sourceId.substringBefore('-').uppercase(),
                         modifier = Modifier.weight(0.30f),
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 24.sp),
                         fontWeight = FontWeight.SemiBold,
                         color = Color.White,
                         maxLines = 1,
@@ -2174,20 +2176,26 @@ private fun PlayerBottomControls(
                         AddToPlaylistButton(
                             onClick = onOpenAddToPlaylist,
                             tint = Color.White.copy(alpha = 0.96f),
+                            buttonSize = 60.dp,
+                            iconSize = 30.dp,
                         )
                         SleepTimerButton(
                             sleepTimer = sleepTimer,
                             onClick = { isSleepTimerDialogVisible = true },
                             tint = Color.White.copy(alpha = 0.96f),
+                            buttonSize = 60.dp,
+                            iconSize = 30.dp,
                         )
                         FavoriteToggleButton(
                             isFavorite = isFavorite,
                             onClick = onToggleFavorite,
                             tint = favoriteTint,
+                            buttonSize = 60.dp,
+                            iconSize = 30.dp,
                             enabled = canToggleFavorite,
                         )
                         Box(modifier = Modifier.weight(1f)) {
-                            PlaybackVolume(snapshot, onPlayerIntent, sliderWidthFraction = 0.5f)
+                            PlaybackVolume(snapshot, onPlayerIntent, sliderWidthFraction = 0.7f)
                         }
                     }
                 }
@@ -2203,6 +2211,7 @@ private fun PlayerBottomControls(
                 .padding(horizontal = 16.dp),
             showTimeLabels = false,
             floating = true,
+            enlarged = true,
         )
     }
     if (isSleepTimerDialogVisible) {
@@ -3024,11 +3033,25 @@ private fun PlaybackProgress(
     modifier: Modifier = Modifier,
     showTimeLabels: Boolean = true,
     floating: Boolean = false,
+    enlarged: Boolean = false,
 ) {
     val duration = snapshot.durationMs.coerceAtLeast(1L)
     var dragPositionMs by remember(snapshot.currentTrack?.id, snapshot.durationMs) {
         mutableStateOf<Long?>(null)
     }
+    val isScrubbing = dragPositionMs != null
+    val trackHeightDpTarget = if (!enlarged) {
+        if (floating) 3f else 4f
+    } else if (isScrubbing) {
+        9f
+    } else {
+        6f
+    }
+    val animatedTrackHeightDp by animateFloatAsState(
+        targetValue = trackHeightDpTarget,
+        animationSpec = tween(durationMillis = 150),
+        label = "progressTrackHeight",
+    )
     val displayPositionMs = (dragPositionMs ?: snapshot.positionMs).coerceIn(0L, duration)
     val progressFraction = (displayPositionMs.toFloat() / duration.toFloat()).coerceIn(0f, 1f)
     val showFlowerParticles = !currentPlatformDescriptor.isAndroidTV() && !currentPlatformDescriptor.isAndroidAutomotivePlatform()
@@ -3086,11 +3109,12 @@ private fun PlaybackProgress(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
-        Box(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(if (floating) 12.dp else 22.dp),
+                .height(if (enlarged) 44.dp else if (floating) 12.dp else 22.dp),
         ) {
+            val boxWidth = maxWidth
             val thumbInsetPx = with(LocalDensity.current) { if (floating) 6.dp.toPx() else 8.dp.toPx() }
             val sliderAlignment = if (floating) Alignment.Center else Alignment.BottomCenter
             if (showFlowerParticles) {
@@ -3113,16 +3137,20 @@ private fun PlaybackProgress(
                 modifier = Modifier
                     .align(sliderAlignment)
                     .fillMaxWidth()
-                    .height(8.dp),
-                trackHeightPx = with(LocalDensity.current) { if (floating) 3.dp.toPx() else 4.dp.toPx() },
+                    .height(if (enlarged) 20.dp else 8.dp),
+                trackHeightPx = with(LocalDensity.current) { animatedTrackHeightDp.dp.toPx() },
             )
             Slider(
                 modifier = Modifier
                     .align(sliderAlignment)
                     .fillMaxWidth()
-                    .height(8.dp)
-                    .graphicsLayer(scaleY = if (floating) 0.36f else 0.44f),
-                colors = transparentTrackSliderColors(),
+                    .height(if (enlarged) 20.dp else 8.dp)
+                    .graphicsLayer(scaleY = if (enlarged) 1f else if (floating) 0.36f else 0.44f),
+                colors = if (enlarged) {
+                    transparentTrackSliderColors(thumbVisible = false)
+                } else {
+                    transparentTrackSliderColors()
+                },
                 value = displayPositionMs.toFloat(),
                 onValueChange = { dragPositionMs = it.toLong() },
                 onValueChangeFinished = {
@@ -3135,6 +3163,34 @@ private fun PlaybackProgress(
                 enabled = snapshot.canSeek && snapshot.durationMs > 0L,
                 valueRange = 0f..duration.toFloat(),
             )
+            if (enlarged && isScrubbing) {
+                val scrubbingInsetDp = 8.dp
+                val thumbCenterX = scrubbingInsetDp + (boxWidth - scrubbingInsetDp * 2f) * progressFraction
+                val bubbleOffsetX = (thumbCenterX - boxWidth / 2f)
+                    .coerceIn(-boxWidth / 2f + 34.dp, boxWidth / 2f - 34.dp)
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .offset(x = bubbleOffsetX)
+                        .clip(RoundedCornerShape(percent = 50))
+                        .background(Color.White.copy(alpha = 0.18f))
+                        .padding(horizontal = 10.dp, vertical = 3.dp),
+                ) {
+                    Text(
+                        text = formatDuration(displayPositionMs),
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 13.sp),
+                        color = Color.White,
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .offset(x = thumbCenterX - boxWidth / 2f, y = -2.5.dp)
+                        .size(15.dp)
+                        .clip(RoundedCornerShape(percent = 50))
+                        .background(Color.White),
+                )
+            }
         }
         if (showTimeLabels) {
             Row(
@@ -3203,7 +3259,7 @@ private fun PlaybackVolume(
         ) {
             Text(
                 text = "${(volume * 100).roundToInt()}%",
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 14.sp),
                 color = Color.White,
             )
         }
@@ -3214,11 +3270,11 @@ private fun PlaybackVolume(
             val sliderModifier =
                 Modifier
                     .fillMaxWidth(sliderWidthFraction.coerceIn(0.2f, 1f))
-                    .height(8.dp)
+                    .height(18.dp)
             RoundedSliderTrack(
                 progressFraction = volume,
                 modifier = sliderModifier,
-                trackHeightPx = with(LocalDensity.current) { 4.dp.toPx() },
+                trackHeightPx = with(LocalDensity.current) { 5.dp.toPx() },
             )
             Slider(
                 modifier = Modifier
@@ -3249,8 +3305,8 @@ private fun playerSliderColors() = SliderDefaults.colors(
 )
 
 @Composable
-private fun transparentTrackSliderColors() = SliderDefaults.colors(
-    thumbColor = Color.White.copy(alpha = 0.98f),
+private fun transparentTrackSliderColors(thumbVisible: Boolean = true) = SliderDefaults.colors(
+    thumbColor = if (thumbVisible) Color.White.copy(alpha = 0.98f) else Color.Transparent,
     activeTrackColor = Color.Transparent,
     inactiveTrackColor = Color.Transparent,
     activeTickColor = Color.Transparent,
