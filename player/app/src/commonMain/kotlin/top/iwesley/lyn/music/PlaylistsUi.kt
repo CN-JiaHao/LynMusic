@@ -2,7 +2,6 @@ package top.iwesley.lyn.music
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -25,13 +24,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -39,9 +36,10 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.List
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Delete
-import androidx.compose.material.icons.rounded.DragHandle
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Sync
@@ -77,10 +75,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.isSecondaryPressed
@@ -95,6 +91,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import kotlinx.coroutines.delay
 import top.iwesley.lyn.music.core.model.ImportSourceType
 import top.iwesley.lyn.music.core.model.NavidromeAudioQuality
 import top.iwesley.lyn.music.core.model.OfflineDownload
@@ -132,7 +129,7 @@ private val PLAYLISTS_TWO_PANE_MIN_WIDTH = 900.dp
  * 这里给歌单列表补一个排序切换，纯本地显示层排序，不写回服务端。
  */
 internal enum class PlaylistSortMode(val label: String) {
-    CUSTOM("自定义（可拖动）"),
+    CUSTOM("自定义（上下箭头）"),
     SERVER("服务端顺序"),
     UPDATED("最近更新"),
     NAME("名称"),
@@ -1087,22 +1084,42 @@ private fun PlaylistListPane(
 ) {
     var sourceFilterMenuExpanded by remember { mutableStateOf(false) }
     var sortMenuExpanded by remember { mutableStateOf(false) }
-    var draggingPlaylistId by remember { mutableStateOf<String?>(null) }
-    var dragOffsetY by remember { mutableStateOf(0f) }
-    var itemHeightPx by remember { mutableStateOf(0f) }
-    val canDragPlaylists = playlistSortMode == PlaylistSortMode.CUSTOM &&
+    val canReorderPlaylists = playlistSortMode == PlaylistSortMode.CUSTOM &&
         !isFilteringByQuery &&
         !isOnlineMode
-    val draggingIndex = remember(playlists, draggingPlaylistId) {
-        playlists.indexOfFirst { it.id == draggingPlaylistId }
-    }
-    val dragTargetIndex = remember(draggingIndex, dragOffsetY, itemHeightPx, playlists.size) {
-        if (draggingIndex < 0 || itemHeightPx <= 0f || playlists.isEmpty()) {
-            draggingIndex
-        } else {
-            val steps = (dragOffsetY / itemHeightPx + if (dragOffsetY >= 0f) 0.5f else -0.5f).toInt()
-            (draggingIndex + steps).coerceIn(0, playlists.lastIndex)
+    // 箭头排序的乐观更新：点击后立即重排显示，不等数据库回流；
+    // 数据回流确认后清除，2 秒超时兜底（写库失败时回退显示真实顺序）。
+    var pendingOrder by remember { mutableStateOf<List<String>?>(null) }
+    LaunchedEffect(pendingOrder) {
+        val pending = pendingOrder ?: return@LaunchedEffect
+        delay(2000)
+        if (pendingOrder == pending) {
+            pendingOrder = null
         }
+    }
+    LaunchedEffect(playlists, pendingOrder) {
+        val pending = pendingOrder ?: return@LaunchedEffect
+        if (playlists.map { it.id } == pending) {
+            pendingOrder = null
+        }
+    }
+    val displayPlaylists = remember(playlists, pendingOrder) {
+        val pending = pendingOrder
+        if (pending == null || !canReorderPlaylists) {
+            playlists
+        } else {
+            pending.mapNotNull { id -> playlists.firstOrNull { it.id == id } } +
+                playlists.filter { playlist -> pending.none { it == playlist.id } }
+        }
+    }
+    fun movePlaylist(from: Int, to: Int) {
+        if (from == to || from !in displayPlaylists.indices || to !in displayPlaylists.indices) {
+            return
+        }
+        val reordered = displayPlaylists.toMutableList().apply { add(to, removeAt(from)) }
+        val orderedIds = reordered.map { it.id }
+        pendingOrder = orderedIds
+        onReorder(orderedIds)
     }
     val mobilePlatform = currentPlatformDescriptor.isMobilePlatform()
     var menuPlaylistId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -1134,7 +1151,6 @@ private fun PlaylistListPane(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
-            userScrollEnabled = draggingPlaylistId == null,
         ) {
             item {
                 PlaylistSectionTitle(
@@ -1268,91 +1284,35 @@ private fun PlaylistListPane(
                     }
                 }
             } else {
-                items(playlists, key = { it.id }) { playlist ->
-                    val itemIndex = playlists.indexOfFirst { it.id == playlist.id }
-                    val itemShiftPx = when {
-                        !canDragPlaylists || draggingIndex < 0 || dragTargetIndex == draggingIndex -> 0f
-                        itemIndex == draggingIndex -> dragOffsetY
-                        dragTargetIndex < draggingIndex && itemIndex in dragTargetIndex until draggingIndex -> itemHeightPx
-                        dragTargetIndex > draggingIndex && itemIndex in (draggingIndex + 1)..dragTargetIndex -> -itemHeightPx
-                        else -> 0f
-                    }
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .onSizeChanged { size ->
-                                if (itemHeightPx <= 0f && size.height > 0) {
-                                    itemHeightPx = size.height.toFloat()
-                                }
+                itemsIndexed(displayPlaylists, key = { _, playlist -> playlist.id }) { itemIndex, playlist ->
+                    PlaylistSummaryCard(
+                        playlist = playlist,
+                        selected = playlist.id == selectedPlaylistId,
+                        mobilePlatform = mobilePlatform,
+                        menuExpanded = menuPlaylistId == playlist.id,
+                        showReorderControls = canReorderPlaylists,
+                        canMoveUp = itemIndex > 0,
+                        canMoveDown = itemIndex < displayPlaylists.lastIndex,
+                        onMoveUp = { movePlaylist(itemIndex, itemIndex - 1) },
+                        onMoveDown = { movePlaylist(itemIndex, itemIndex + 1) },
+                        onClick = { onSelect(playlist.id) },
+                        onOpenMenu = { menuPlaylistId = playlist.id },
+                        onDismissMenu = {
+                            if (menuPlaylistId == playlist.id) {
+                                menuPlaylistId = null
                             }
-                            .zIndex(if (itemIndex == draggingIndex) 1f else 0f)
-                            .offset { IntOffset(0, itemShiftPx.toInt()) },
-                    ) {
-                        PlaylistSummaryCard(
-                            playlist = playlist,
-                            selected = playlist.id == selectedPlaylistId,
-                            mobilePlatform = mobilePlatform,
-                            menuExpanded = menuPlaylistId == playlist.id,
-                            showDragHandle = canDragPlaylists,
-                            dragModifier = Modifier.pointerInput(canDragPlaylists) {
-                                if (!canDragPlaylists) return@pointerInput
-                                detectDragGesturesAfterLongPress(
-                                    onDragStart = {
-                                        draggingPlaylistId = playlist.id
-                                        dragOffsetY = 0f
-                                    },
-                                    onDragCancel = {
-                                        draggingPlaylistId = null
-                                        dragOffsetY = 0f
-                                    },
-                                    onDragEnd = {
-                                        val from = playlists.indexOfFirst { it.id == playlist.id }
-                                        val steps = if (itemHeightPx > 0f) {
-                                            (dragOffsetY / itemHeightPx + if (dragOffsetY >= 0f) 0.5f else -0.5f).toInt()
-                                        } else {
-                                            0
-                                        }
-                                        val to = if (from < 0 || playlists.isEmpty()) {
-                                            -1
-                                        } else {
-                                            (from + steps).coerceIn(0, playlists.lastIndex)
-                                        }
-                                        draggingPlaylistId = null
-                                        dragOffsetY = 0f
-                                        if (from >= 0 && to >= 0 && to != from) {
-                                            val reordered = playlists.toMutableList()
-                                            reordered.add(to, reordered.removeAt(from))
-                                            onReorder(reordered.map { it.id })
-                                        }
-                                    },
-                                    onDrag = { _, dragAmount ->
-                                        dragOffsetY += dragAmount.y
-                                    },
-                                )
-                            },
-                            onClick = {
-                                if (draggingPlaylistId == null) {
-                                    onSelect(playlist.id)
-                                }
-                            },
-                            onOpenMenu = { menuPlaylistId = playlist.id },
-                            onDismissMenu = {
-                                if (menuPlaylistId == playlist.id) {
-                                    menuPlaylistId = null
-                                }
-                            },
-                            onRequestRename = {
-                                menuPlaylistId = null
-                                pendingRenamePlaylistId = playlist.id
-                                pendingRenamePlaylistName = playlist.name
-                            },
-                            onRequestDelete = {
-                                menuPlaylistId = null
-                                pendingDeletePlaylistId = playlist.id
-                                pendingDeletePlaylistName = playlist.name
-                            },
-                        )
-                    }
+                        },
+                        onRequestRename = {
+                            menuPlaylistId = null
+                            pendingRenamePlaylistId = playlist.id
+                            pendingRenamePlaylistName = playlist.name
+                        },
+                        onRequestDelete = {
+                            menuPlaylistId = null
+                            pendingDeletePlaylistId = playlist.id
+                            pendingDeletePlaylistName = playlist.name
+                        },
+                    )
                 }
             }
         }
@@ -1440,8 +1400,11 @@ private fun PlaylistSummaryCard(
     selected: Boolean,
     mobilePlatform: Boolean,
     menuExpanded: Boolean,
-    showDragHandle: Boolean = false,
-    dragModifier: Modifier = Modifier,
+    showReorderControls: Boolean = false,
+    canMoveUp: Boolean = false,
+    canMoveDown: Boolean = false,
+    onMoveUp: () -> Unit = {},
+    onMoveDown: () -> Unit = {},
     onClick: () -> Unit,
     onOpenMenu: () -> Unit,
     onDismissMenu: () -> Unit,
@@ -1451,8 +1414,8 @@ private fun PlaylistSummaryCard(
     val shellColors = mainShellColors
     val cardShape = RoundedCornerShape(24.dp)
     val interactionModifier = if (mobilePlatform) {
-        if (showDragHandle) {
-            // 自定义排序模式下长按交给拖拽手势，菜单改由右上角“更多”按钮打开
+        if (showReorderControls) {
+            // 自定义排序模式下不做长按菜单，避免和点按冲突，菜单改由右上角“更多”按钮打开
             Modifier.clickable(onClick = onClick)
         } else {
             Modifier.combinedClickable(
@@ -1476,11 +1439,7 @@ private fun PlaylistSummaryCard(
             .clickable(onClick = onClick)
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .then(dragModifier),
-    ) {
+    Box(modifier = Modifier.fillMaxWidth()) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1526,7 +1485,7 @@ private fun PlaylistSummaryCard(
                         },
                     )
                 }
-                if (showDragHandle) {
+                if (showReorderControls) {
                     Box {
                         IconButton(onClick = onOpenMenu) {
                             Icon(
@@ -1546,21 +1505,47 @@ private fun PlaylistSummaryCard(
                             onRequestDelete = onRequestDelete,
                         )
                     }
-                    Icon(
-                        imageVector = Icons.Rounded.DragHandle,
-                        contentDescription = "长按卡片拖动调整顺序",
-                        tint = if (selected) {
-                            MaterialTheme.colorScheme.onSecondary
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                        modifier = Modifier.size(32.dp),
-                    )
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        IconButton(
+                            onClick = onMoveUp,
+                            enabled = canMoveUp,
+                            modifier = Modifier.size(30.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.KeyboardArrowUp,
+                                contentDescription = "上移歌单",
+                                tint = if (selected) {
+                                    MaterialTheme.colorScheme.onSecondary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                                modifier = Modifier.alpha(if (canMoveUp) 1f else 0.38f),
+                            )
+                        }
+                        IconButton(
+                            onClick = onMoveDown,
+                            enabled = canMoveDown,
+                            modifier = Modifier.size(30.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.KeyboardArrowDown,
+                                contentDescription = "下移歌单",
+                                tint = if (selected) {
+                                    MaterialTheme.colorScheme.onSecondary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                                modifier = Modifier.alpha(if (canMoveDown) 1f else 0.38f),
+                            )
+                        }
+                    }
                 }
             }
         }
 
-        if (!showDragHandle) {
+        if (!showReorderControls) {
             PlaylistCardActionsMenu(
                 expanded = menuExpanded,
                 onDismissRequest = onDismissMenu,
